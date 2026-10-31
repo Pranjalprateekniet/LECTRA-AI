@@ -172,6 +172,14 @@ class TranscriptService:
             # 1. Extract raw track via provider
             raw_track = self.extractor.extract_subtitles(video.url)
 
+            # If track is non-English, route to Whisper translation so English text is produced
+            if raw_track.language != "en":
+                logger.info(
+                    "Non-English subtitles detected; falling back to Whisper translation",
+                    extra={"video_id": video.youtube_id, "subtitle_language": raw_track.language},
+                )
+                return self._run_whisper_fallback(session, video, stage)
+
             # 2. Parse into normalized segment models
             segments = parse_subtitle_content(
                 content=raw_track.content,

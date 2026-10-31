@@ -83,6 +83,9 @@ class Video(Base):
     transcripts: Mapped[List["TranscriptSegment"]] = relationship(
         "TranscriptSegment", back_populates="video", cascade="all, delete-orphan"
     )
+    chunks: Mapped[List["VideoChunk"]] = relationship(
+        "VideoChunk", back_populates="video", cascade="all, delete-orphan"
+    )
 
 
 class ProcessingStage(Base):
@@ -128,3 +131,27 @@ class TranscriptSegment(Base):
     source: Mapped[str] = mapped_column(String(20), nullable=False)  # "manual" | "generated"
 
     video: Mapped["Video"] = relationship("Video", back_populates="transcripts")
+
+
+class VideoChunk(Base):
+    """Derived 75-second retrieval chunk aggregated from transcript segments (Phase 4)."""
+
+    __tablename__ = "video_chunks"
+    __table_args__ = (
+        UniqueConstraint("video_id", "chunk_index", name="uq_video_chunks_video_index"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    video_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("videos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    end_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    duration_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_segment_start_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_segment_end_index: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    video: Mapped["Video"] = relationship("Video", back_populates="chunks")

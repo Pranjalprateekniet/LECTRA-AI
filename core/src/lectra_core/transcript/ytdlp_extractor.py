@@ -55,6 +55,7 @@ def select_best_track(
     automatic_captions: Dict[str, List[Dict[str, Any]]],
     preferred_languages: List[str],
     prefer_manual: bool = True,
+    allow_non_english: bool = False,
 ) -> Optional[Tuple[List[Dict[str, Any]], str, str]]:
     """Select the best available subtitle track according to preferences.
 
@@ -114,6 +115,17 @@ def select_best_track(
         manual_match = _find_matching_track(manual_tracks)
         if manual_match:
             return manual_match[0], manual_match[1], "manual"
+
+    # 3. If English subtitles are unavailable and allow_non_english is enabled,
+    # check for available non-English subtitles as translation input.
+    if allow_non_english:
+        for lang_code, fmt_list in manual_tracks.items():
+            if fmt_list and not _is_translated_track(fmt_list):
+                return fmt_list, lang_code, "manual"
+
+        for lang_code, fmt_list in auto_tracks.items():
+            if fmt_list and not _is_translated_track(fmt_list):
+                return fmt_list, lang_code, "generated"
 
     return None
 

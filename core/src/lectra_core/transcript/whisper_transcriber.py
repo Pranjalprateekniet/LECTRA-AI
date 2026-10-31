@@ -304,11 +304,15 @@ class FasterWhisperTranscriber:
                 },
             )
 
+            is_multilingual = not self.settings.whisper_model_name.endswith(".en")
+            task = "translate" if is_multilingual else "transcribe"
+            lang_param = None if is_multilingual else "en"
+
             try:
                 segments_iter, info = model.transcribe(
                     str(audio_path),
-                    language="en",
-                    task="transcribe",
+                    language=lang_param,
+                    task=task,
                     beam_size=self.settings.whisper_beam_size,
                     vad_filter=True,
                 )
@@ -330,8 +334,8 @@ class FasterWhisperTranscriber:
                     )
                     segments_iter, info = model.transcribe(
                         str(audio_path),
-                        language="en",
-                        task="transcribe",
+                        language=lang_param,
+                        task=task,
                         beam_size=self.settings.whisper_beam_size,
                         vad_filter=True,
                     )
@@ -339,11 +343,18 @@ class FasterWhisperTranscriber:
                 else:
                     raise
 
-            # Enforce English-only policy: detect non-English spoken content
+            # Enforce English-only policy: if using English-only model (.en), verify language
             detected_lang = getattr(info, "language", "en")
-            if detected_lang != "en":
-                prob = getattr(info, "language_probability", 0.0)
-                raise NonEnglishAudioError(detected_language=detected_lang, probability=prob)
+            if not is_multilingual:
+                if detected_lang != "en":
+                    prob = getattr(info, "language_probability", 0.0)
+                    raise NonEnglishAudioError(detected_language=detected_lang, probability=prob)
+            else:
+                if detected_lang != "en":
+                    logger.info(
+                        "Multilingual Whisper translated non-English speech to English",
+                        extra={"video_id": youtube_id, "source_language": detected_lang},
+                    )
 
             segments: List[TranscriptSegmentData] = []
             for seg in raw_segments:

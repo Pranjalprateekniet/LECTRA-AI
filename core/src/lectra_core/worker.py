@@ -22,6 +22,8 @@ logger = get_logger("lectra.worker")
 DISCOVER_JOB_TYPE = "discover_playlist"
 EXTRACT_TRANSCRIPTS_JOB_TYPE = "extract_transcripts"
 EXTRACT_VIDEO_TRANSCRIPT_JOB_TYPE = "extract_video_transcript"
+CHUNK_VIDEO_JOB_TYPE = "chunk_video"
+CHUNK_PLAYLIST_JOB_TYPE = "chunk_playlist"
 
 
 class IngestionWorker:
@@ -111,6 +113,10 @@ class IngestionWorker:
             self._process_extract_transcripts_job(session, job)
         elif job.job_type == EXTRACT_VIDEO_TRANSCRIPT_JOB_TYPE:
             self._process_extract_video_transcript_job(session, job)
+        elif job.job_type == CHUNK_VIDEO_JOB_TYPE:
+            self._process_chunk_video_job(session, job)
+        elif job.job_type == CHUNK_PLAYLIST_JOB_TYPE:
+            self._process_chunk_playlist_job(session, job)
         elif job.job_type == "test_job":
             pass
         else:
@@ -195,6 +201,39 @@ class IngestionWorker:
         summary = service.process_video(session, video)
         if summary.status == "EXTRACTION_FAILED":
             raise RuntimeError(f"Video transcript extraction failed: {summary.error_detail}")
+
+    def _process_chunk_video_job(self, session: Session, job: Job) -> None:
+        payload = job.payload or {}
+        video_id = payload.get("video_id")
+        if not video_id:
+            raise ValueError("Job payload is missing 'video_id'.")
+        video = session.get(Video, video_id)
+        if not video:
+            raise ValueError(f"Video '{video_id}' not found.")
+
+        from lectra_core.chunking.service import ChunkingService
+
+        service = ChunkingService(settings=self.settings)
+        service.chunk_video(session, video)
+
+    def _process_chunk_playlist_job(self, session: Session, job: Job) -> None:
+        payload = job.payload or {}
+        playlist_id = payload.get("playlist_id")
+        if not playlist_id:
+            raise ValueError("Job payload is missing 'playlist_id'.")
+
+        from lectra_core.chunking.service import ChunkingService
+
+        service = ChunkingService(settings=self.settings)
+        videos = session.scalars(
+            select(Video).where(
+                Video.playlist_id == playlist_id,
+                Video.status == "TRANSCRIPT_READY",
+            )
+        ).all()
+        for v in videos:
+            service.chunk_video(session, v)
+            session.commit()
 
     def _handle_job_failure(self, session: Session, job: Job, exc: Exception) -> None:
         """Handle a failed job: retry if attempts < max_retries, else fail."""
