@@ -64,10 +64,11 @@ class Settings(BaseSettings):
             return None
         return v
 
-    # Embeddings
-    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_device: Literal["cpu", "cuda"] = "cpu"
-    embedding_batch_size: int = Field(default=32, ge=1)
+    # Embeddings — Phase 5
+    embedding_model_name: str = "google/embeddinggemma-2"
+    embedding_device: Literal["cpu", "cuda", "auto"] = "cuda"
+    embedding_batch_size: int = Field(default=8, ge=1)
+    embedding_dimensions: int = 768
 
     # Speech Recognition (faster-whisper) — Phase 3.2
     # Model name: tiny.en, base.en, small.en, medium.en, large-v3, etc.
