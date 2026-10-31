@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lectra-backend"
+version = "0.1.0"
+description = "FastAPI backend API service for Revision RAG"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "lectra-core",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[project.scripts]
+lectra-server = "lectra_backend.main:start"
+
+[tool.uv.sources]
+lectra-core = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lectra_backend"]
