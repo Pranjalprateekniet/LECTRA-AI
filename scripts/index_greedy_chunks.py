@@ -109,19 +109,39 @@ def main() -> int:
 
             # Run indexing
             v_start = time.time()
-            result = indexing_service.index_video(
-                session=session,
-                video=video,
-            )
-            v_duration = time.time() - v_start
+            try:
+                result = indexing_service.index_video(
+                    session=session,
+                    video=video,
+                )
+                v_duration = time.time() - v_start
 
-            total_chunks_indexed += result.chunks_indexed
-            print(
-                f"        Indexed & Verified: {result.chunks_indexed} points in {v_duration:.2f}s "
-                f"({result.chunks_indexed/v_duration if v_duration > 0 else 0:.1f} chunks/sec)"
-            )
-            print(f"        Stage Status:       {result.status}")
-            print(f"        Updated Video Status: {video.status}")
+                if result.status == "COMPLETED":
+                    # Explicitly commit SQLite transaction for the video
+                    session.commit()
+                    total_chunks_indexed += result.chunks_indexed
+                    rate = (
+                        result.chunks_indexed / v_duration if v_duration > 0 else 0.0
+                    )
+                    print(
+                        f"        Indexed & Verified: {result.chunks_indexed} points in "
+                        f"{v_duration:.2f}s ({rate:.1f} chunks/sec)"
+                    )
+                    print(f"        Stage Status:       {result.status}")
+                    print(f"        Updated Video Status: {video.status}")
+                else:
+                    # Persist FAILED stage state
+                    session.commit()
+                    print(
+                        f"        ERROR: Indexing failed for {video.youtube_id}: {result.error}",
+                        file=sys.stderr,
+                    )
+            except Exception as exc:
+                session.rollback()
+                print(
+                    f"        EXCEPTION during indexing for {video.youtube_id}: {exc}",
+                    file=sys.stderr,
+                )
 
         # 3. Overall database verification
         print("\n[Step 3] Verifying SQLite database status:")

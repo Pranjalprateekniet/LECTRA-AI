@@ -83,7 +83,9 @@ class IndexingService:
             "youtube_url": f"https://www.youtube.com/watch?v={video.youtube_id}&t={int(chunk.start_seconds)}",
         }
 
-    def index_video(self, session: Session, video: Video) -> IndexingResult:
+    def index_video(
+        self, session: Session, video: Video, force: bool = False
+    ) -> IndexingResult:
         """Index all chunks of a video into Qdrant idempotently with verification."""
         stage = self._get_or_create_stage(session, video.id)
         stage.status = "IN_PROGRESS"
@@ -111,6 +113,33 @@ class IndexingService:
             # 1. Ensure collection exists and is valid
             self.vector_store.ensure_collection()
 
+            expected_ids = [c.id for c in chunks]
+
+            # Idempotency guard: if all points already exist and are verified in Qdrant,
+            # persist the checkpoint without redundant re-embedding or re-uploading.
+            if not force:
+                existing_points = self.vector_store.retrieve_points(expected_ids)
+                if len(existing_points) == len(expected_ids):
+                    logger.info(
+                        "All video chunks already verified in Qdrant; skipping re-embedding",
+                        extra={"video_id": video.youtube_id, "chunk_count": len(chunks)},
+                    )
+                    stage.status = "COMPLETED"
+                    stage.completed_at = stage.completed_at or datetime.now(timezone.utc)
+                    stage.error_category = None
+                    stage.error_detail = None
+
+                    video.status = "INDEXED"
+                    session.flush()
+
+                    return IndexingResult(
+                        video_id=video.id,
+                        youtube_id=video.youtube_id,
+                        chunks_indexed=len(existing_points),
+                        status="COMPLETED",
+                        verified_points=len(existing_points),
+                    )
+
             # 2. Generate embeddings using EmbeddingGemma 2
             logger.info(
                 "Generating embeddings for video chunks",
@@ -132,7 +161,6 @@ class IndexingService:
             self.vector_store.upsert_points(points)
 
             # 5. Verify ingestion via point retrieval
-            expected_ids = [c.id for c in chunks]
             retrieved = self.vector_store.retrieve_points(expected_ids)
 
             if len(retrieved) != len(expected_ids):

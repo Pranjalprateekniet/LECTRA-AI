@@ -262,3 +262,82 @@ def test_indexing_service_failure_recovery_on_verification_mismatch(mock_db):
     assert stage is not None
     assert stage.status == "FAILED"
     assert stage.error_category == "INDEXING_FAILED"
+
+
+def test_sqlite_checkpoint_persistence_on_successful_indexing(mock_db):
+    """Regression test ensuring SQLite checkpoint changes are committed after indexing."""
+    session, settings = mock_db
+
+    video = Video(
+        playlist_id="pl_test_id",
+        youtube_id="yt_persistence_test",
+        title="Persistence Test Video",
+        url="https://youtube.com/watch?v=yt_persistence_test",
+        status="CHUNKED",
+    )
+    session.add(video)
+    session.flush()
+
+    chunk_id = str(uuid.uuid4())
+    chunk = VideoChunk(
+        id=chunk_id,
+        video_id=video.id,
+        chunk_index=0,
+        start_seconds=0.0,
+        end_seconds=75.0,
+        duration_seconds=75.0,
+        text="Sample text for persistence test.",
+        token_count=15,
+        source_segment_start_index=0,
+        source_segment_end_index=3,
+    )
+    session.add(chunk)
+    session.commit()
+
+    mock_embed = MagicMock()
+    mock_embed.embed_chunks.return_value = [[0.2] * 768]
+
+    # First call: not yet in store; second call: verified
+    mock_store = MagicMock()
+    mock_store.retrieve_points.side_effect = [[], [MagicMock(id=chunk_id)]]
+
+    service = IndexingService(
+        settings=settings,
+        embedding_service=mock_embed,
+        vector_store=mock_store,
+    )
+
+    result = service.index_video(session, video)
+    assert result.status == "COMPLETED"
+    assert mock_embed.embed_chunks.call_count == 1
+    assert mock_store.upsert_points.call_count == 1
+
+    # Simulate orchestrator commit
+    session.commit()
+
+    # Expire all cached objects to force loading from disk/DB
+    session.expire_all()
+
+    persisted_video = session.get(Video, video.id)
+    assert persisted_video is not None
+    assert persisted_video.status == "INDEXED"
+
+    persisted_stage = session.query(ProcessingStage).filter_by(
+        video_id=video.id, stage_name="INDEXING"
+    ).first()
+    assert persisted_stage is not None
+    assert persisted_stage.status == "COMPLETED"
+    assert persisted_stage.completed_at is not None
+    assert persisted_stage.error_category is None
+
+    # Idempotent second run: points already exist in Qdrant
+    mock_store.retrieve_points.side_effect = None
+    mock_store.retrieve_points.return_value = [MagicMock(id=chunk_id)]
+
+    rerun_result = service.index_video(session, persisted_video)
+    session.commit()
+
+    assert rerun_result.status == "COMPLETED"
+    # Embed chunks and upsert must NOT be called again
+    assert mock_embed.embed_chunks.call_count == 1
+    assert mock_store.upsert_points.call_count == 1
