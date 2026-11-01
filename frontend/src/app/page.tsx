@@ -269,77 +269,78 @@ export default function Home() {
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Tab 2: Revision Chatbot */}
-        {activeTab === "qa" ? (
+        <div className={activeTab === "qa" ? "block" : "hidden"}>
           <ChatInterface
             playlists={playlists}
             defaultPlaylistId={selectedPlaylistId}
           />
-        ) : (
-          <>
-            {/* Top Row: Playlist Submission Form */}
-            <PlaylistSubmitForm
-              onSubmit={handlePlaylistSubmit}
-              isSubmitting={isSubmitting}
-            />
+        </div>
 
-            {/* Submission Alerts */}
-            {submitSuccess && (
-              <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-4 py-3 rounded-xl animate-fade-in">
-                <CheckCircleIcon className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span className="flex-1">{submitSuccess}</span>
-                <button
-                  onClick={() => setSubmitSuccess(null)}
-                  className="text-slate-400 hover:text-slate-200 text-xs ml-2"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
+        {/* Tab 1: Data Ingestion */}
+        <div className={activeTab === "ingestion" ? "space-y-6" : "hidden"}>
+          {/* Top Row: Playlist Submission Form */}
+          <PlaylistSubmitForm
+            onSubmit={handlePlaylistSubmit}
+            isSubmitting={isSubmitting}
+          />
 
-            {submitError && (
-              <div className="flex items-center gap-2 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 px-4 py-3 rounded-xl animate-fade-in">
-                <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-400" />
-                <span className="flex-1">{submitError}</span>
-                <button
-                  onClick={() => setSubmitError(null)}
-                  className="text-slate-400 hover:text-slate-200 text-xs ml-2"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
+          {/* Submission Alerts */}
+          {submitSuccess && (
+            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-4 py-3 rounded-xl animate-fade-in">
+              <CheckCircleIcon className="w-4 h-4 shrink-0 text-emerald-400" />
+              <span className="flex-1">{submitSuccess}</span>
+              <button
+                onClick={() => setSubmitSuccess(null)}
+                className="text-slate-400 hover:text-slate-200 text-xs ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-            {/* Playlists Selector */}
-            <PlaylistSelector
-              playlists={playlists}
-              selectedId={selectedPlaylistId}
-              onSelect={(id) => setSelectedPlaylistId(id)}
-              isLoading={playlistsLoading}
-            />
+          {submitError && (
+            <div className="flex items-center gap-2 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 px-4 py-3 rounded-xl animate-fade-in">
+              <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-400" />
+              <span className="flex-1">{submitError}</span>
+              <button
+                onClick={() => setSubmitError(null)}
+                className="text-slate-400 hover:text-slate-200 text-xs ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
-            {/* Selected Playlist Status & Metrics */}
-            {selectedPlaylistId && (
-              <div className="space-y-6 pt-2">
-                {/* 7 Metric Cards */}
-                <StatisticsDashboard status={status} loading={detailsLoading} />
+          {/* Playlists Selector */}
+          <PlaylistSelector
+            playlists={playlists}
+            selectedId={selectedPlaylistId}
+            onSelect={(id) => setSelectedPlaylistId(id)}
+            isLoading={playlistsLoading}
+          />
 
-                {/* Progress Breakdown Bar */}
-                <PlaylistProgressBar status={status} />
+          {/* Selected Playlist Status & Metrics */}
+          {selectedPlaylistId && (
+            <div className="space-y-6 pt-2">
+              {/* 7 Metric Cards */}
+              <StatisticsDashboard status={status} loading={detailsLoading} />
 
-                {/* 6-Stage Video Pipeline Table */}
-                <VideoProcessingTable
-                  videos={videos}
-                  loading={detailsLoading}
-                  onRetryVideo={handleRetryVideo}
-                  onDeleteVideo={handleDeleteVideo}
-                />
+              {/* Progress Breakdown Bar */}
+              <PlaylistProgressBar status={status} />
 
-                {/* Persisted Chronological Activity Log */}
-                <ActivityLog events={activity} loading={detailsLoading} />
-              </div>
-            )}
-          </>
-        )}
+              {/* 6-Stage Video Pipeline Table */}
+              <VideoProcessingTable
+                videos={videos}
+                loading={detailsLoading}
+                onRetryVideo={handleRetryVideo}
+                onDeleteVideo={handleDeleteVideo}
+              />
+
+              {/* Persisted Chronological Activity Log */}
+              <ActivityLog events={activity} loading={detailsLoading} />
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Footer */}

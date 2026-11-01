@@ -4,6 +4,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { ChatMessage, CitationItem, Playlist } from "@/types/api";
 import { api } from "@/lib/api";
 import { findFirstValidCitation, isValidCitation } from "@/lib/citations";
+import {
+  clearChatStorage,
+  loadChatHistory,
+  loadSelectedCitation,
+  saveChatHistory,
+  saveSelectedCitation,
+} from "@/lib/chatStorage";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { YouTubePlayerPanel } from "./YouTubePlayerPanel";
 import {
@@ -43,13 +50,17 @@ const STARTER_QUESTIONS = [
 export { isValidCitation, findFirstValidCitation };
 
 let messageSeq = 0;
-function generateMessageId(prefix: "user" | "assistant"): string {
+export function generateMessageId(prefix: "user" | "assistant"): string {
   messageSeq += 1;
-  return `${prefix}-${messageSeq}`;
+  return `${prefix}-${Date.now()}-${messageSeq}`;
 }
 
 export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    return loadChatHistory();
+  });
   const [inputQuery, setInputQuery] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | "ALL">(
     defaultPlaylistId || "ALL"
@@ -66,7 +77,19 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
   // Active Video Player Selection
-  const [selectedCitation, setSelectedCitation] = useState<CitationItem | null>(null);
+  const [selectedCitation, setSelectedCitation] = useState<CitationItem | null>(() => {
+    if (typeof window === "undefined") return null;
+    const saved = loadSelectedCitation();
+    if (saved) return saved;
+    const history = loadChatHistory();
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === "assistant" && history[i].citations) {
+        const firstValid = findFirstValidCitation(history[i].citations!);
+        if (firstValid) return firstValid;
+      }
+    }
+    return null;
+  });
 
   // Mobile View Switcher ("chat" | "player")
   const [mobileTab, setMobileTab] = useState<"chat" | "player">("chat");
@@ -74,6 +97,41 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeRequestIdRef = useRef<number>(0);
+
+  // Hydrate chat history and citation state from localStorage on client mount
+  useEffect(() => {
+    const storedMessages = loadChatHistory();
+    if (storedMessages.length > 0) {
+      setMessages(storedMessages);
+      const storedCitation = loadSelectedCitation();
+      if (storedCitation) {
+        setSelectedCitation(storedCitation);
+      } else {
+        for (let i = storedMessages.length - 1; i >= 0; i--) {
+          if (storedMessages[i].role === "assistant" && storedMessages[i].citations) {
+            const firstValid = findFirstValidCitation(storedMessages[i].citations!);
+            if (firstValid) {
+              setSelectedCitation(firstValid);
+              break;
+            }
+          }
+        }
+      }
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Persist messages only AFTER initial hydration has completed
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveChatHistory(messages);
+  }, [messages, isHydrated]);
+
+  // Persist selectedCitation only AFTER initial hydration has completed
+  useEffect(() => {
+    if (!isHydrated) return;
+    saveSelectedCitation(selectedCitation);
+  }, [selectedCitation, isHydrated]);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -171,6 +229,7 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
       setSelectedCitation(null);
       setErrorBanner(null);
       setIsLoading(false);
+      clearChatStorage();
     }
   };
 
@@ -245,10 +304,11 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
             <button
               onClick={handleClearHistory}
               className="text-xs text-slate-400 hover:text-rose-400 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-rose-900/50 hover:bg-rose-950/30 transition flex items-center gap-1.5 font-mono"
-              title="Clear all messages"
+              title="Clear Chat"
+              aria-label="Clear Chat"
             >
               <TrashIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Clear History</span>
+              <span className="hidden sm:inline">Clear Chat</span>
             </button>
           )}
 
