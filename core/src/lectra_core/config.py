@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     embedding_batch_size: int = Field(default=8, ge=1)
     embedding_dimensions: int = 768
 
+    # Retrieval — Phase 6
+    retrieval_default_top_k: int = Field(default=5, ge=1, le=100)
+    retrieval_default_score_threshold: Optional[float] = None
+
     # Speech Recognition (faster-whisper) — Phase 3.2
     # Model name: tiny.en, base.en, small.en, medium.en, large-v3, etc.
     whisper_model_name: str = "small.en"

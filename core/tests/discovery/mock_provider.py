@@ -11,7 +11,7 @@ from lectra_core.discovery.ytdlp_client import (
 
 
 def make_entry(
-    index: int, video_id: str, title: str = None, duration: float = 600.0
+    index: int, video_id: str, title: Optional[str] = None, duration: float = 600.0
 ) -> PlaylistEntry:
     """Build one flat playlist entry."""
     return PlaylistEntry(
@@ -37,7 +37,7 @@ class FakeProvider:
         self.playlist_title = title
         self.entries = entries
         self.playlist_error: Optional[Exception] = None
-        self.video_results = {}
+        self.video_results: dict[str, VideoInfo] = {}
         for e in entries:
             url = f"https://www.youtube.com/watch?v={e.youtube_id}"
             if url not in self.video_results:
