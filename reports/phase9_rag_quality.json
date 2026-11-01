@@ -1,0 +1,228 @@
+{
+  "status": "PASS",
+  "total_cases": 8,
+  "passed_cases": 8,
+  "results": [
+    {
+      "id": "q01_concept_greedy_choice",
+      "category": "conceptual",
+      "query": "Why do we sort meetings by end time rather than start time in the meeting room problem?",
+      "status": "answered",
+      "status_expected": "answered",
+      "status_ok": true,
+      "citations_count": 2,
+      "citations": [
+        {
+          "source_id": "S3",
+          "youtube_id": "II6ziNnub1Q",
+          "video_title": "N meetings In One Room | Greedy Algorithm",
+          "start_seconds": 174.08,
+          "end_seconds": 262.479
+        },
+        {
+          "source_id": "S4",
+          "youtube_id": "II6ziNnub1Q",
+          "video_title": "N meetings In One Room | Greedy Algorithm",
+          "start_seconds": 526.72,
+          "end_seconds": 614.16
+        }
+      ],
+      "answer_preview": "We sort the meetings by their finishing (end) times because the greedy strategy relies on picking the meeting that leaves the room free as early as possible. By choosing the earliest\u2011finishing meeting...",
+      "passed": true
+    },
+    {
+      "id": "q07_algo_two_pointer_platforms",
+      "category": "algorithm_explanation",
+      "query": "How does the two-pointer approach work for finding the minimum number of platforms?",
+      "status": "answered",
+      "status_expected": "answered",
+      "status_ok": true,
+      "citations_count": 4,
+      "citations": [
+        {
+          "source_id": "S1",
+          "youtube_id": "dxVcMDI7vyI",
+          "video_title": "Minimum Platforms | Greedy Algorithms",
+          "start_seconds": 887.25,
+          "end_seconds": 976.97
+        },
+        {
+          "source_id": "S3",
+          "youtube_id": "dxVcMDI7vyI",
+          "video_title": "Minimum Platforms | Greedy Algorithms",
+          "start_seconds": 976.97,
+          "end_seconds": 1062.53
+        },
+        {
+          "source_id": "S4",
+          "youtube_id": "dxVcMDI7vyI",
+          "video_title": "Minimum Platforms | Greedy Algorithms",
+          "start_seconds": 621.89,
+          "end_seconds": 708.97
+        },
+        {
+          "source_id": "S5",
+          "youtube_id": "dxVcMDI7vyI",
+          "video_title": "Minimum Platforms | Greedy Algorithms",
+          "start_seconds": 708.97,
+          "end_seconds": 798.89
+        }
+      ],
+      "answer_preview": "The algorithm first sorts the arrival times and the departure times of all trains in ascending order. It then uses two indices \u2013\u202fi for the next arrival and j for the next departure \u2013\u202fas two pointers t...",
+      "passed": true
+    },
+    {
+      "id": "q13_compl_platforms_space_time",
+      "category": "complexity",
+      "query": "What is the overall time and space complexity of finding the minimum platforms using two pointers?",
+      "status": "answered",
+      "status_expected": "answered",
+      "status_ok": true,
+      "citations_count": 1,
+      "citations": [
+        {
+          "source_id": "S1",
+          "youtube_id": "dxVcMDI7vyI",
+          "video_title": "Minimum Platforms | Greedy Algorithms",
+          "start_seconds": 798.89,
+          "end_seconds": 887.25
+        }
+      ],
+      "answer_preview": "The algorithm first sorts the arrival and departure arrays, which costs O(n\u202flog\u202fn) time (sorting two arrays is 2\u00b7O(n\u202flog\u202fn) = O(n\u202flog\u202fn)). After sorting, the two\u2011pointer scan traverses each array once...",
+      "passed": true
+    },
+    {
+      "id": "q19_step_job_sequencing_walkthrough",
+      "category": "multi_step",
+      "query": "Walk through the greedy choice and timeline slot assignment for Job Sequencing with deadlines.",
+      "status": "answered",
+      "status_expected": "answered",
+      "status_ok": true,
+      "citations_count": 4,
+      "citations": [
+        {
+          "source_id": "S2",
+          "youtube_id": "LjPx4wQaRIs",
+          "video_title": "Job Sequencing Problem | Greedy Algorithms",
+          "start_seconds": 697.36,
+          "end_seconds": 785.76
+        },
+        {
+          "source_id": "S3",
+          "youtube_id": "LjPx4wQaRIs",
+          "video_title": "Job Sequencing Problem | Greedy Algorithms",
+          "start_seconds": 434.8,
+          "end_seconds": 518.56
+        },
+        {
+          "source_id": "S4",
+          "youtube_id": "LjPx4wQaRIs",
+          "video_title": "Job Sequencing Problem | Greedy Algorithms",
+          "start_seconds": 84.88,
+          "end_seconds": 171.76
+        },
+        {
+          "source_id": "S5",
+          "youtube_id": "LjPx4wQaRIs",
+          "video_title": "Job Sequencing Problem | Greedy Algorithms",
+          "start_seconds": 518.56,
+          "end_seconds": 608.56
+        }
+      ],
+      "answer_preview": "The greedy algorithm for the Job Sequencing problem works in two stages.  First, we sort all jobs by decreasing profit \u2013 this is the *greedy choice* because taking the highest\u2011profit job first gives t...",
+      "passed": true
+    },
+    {
+      "id": "q02_concept_knapsack_ratio",
+      "category": "multiple_chunks",
+      "query": "Why is value per unit weight used to choose items in fractional knapsack?",
+      "status": "answered",
+      "status_expected": "answered",
+      "status_ok": true,
+      "citations_count": 3,
+      "citations": [
+        {
+          "source_id": "S3",
+          "youtube_id": "F_DDzYnxO14",
+          "video_title": "Fractional Knapsack | Greedy Algorithms",
+          "start_seconds": 264.56,
+          "end_seconds": 352.479
+        },
+        {
+          "source_id": "S4",
+          "youtube_id": "F_DDzYnxO14",
+          "video_title": "Fractional Knapsack | Greedy Algorithms",
+          "start_seconds": 87.36,
+          "end_seconds": 177.2
+        },
+        {
+          "source_id": "S5",
+          "youtube_id": "F_DDzYnxO14",
+          "video_title": "Fractional Knapsack | Greedy Algorithms",
+          "start_seconds": 696.399,
+          "end_seconds": 786.24
+        }
+      ],
+      "answer_preview": "In the fractional knapsack problem we want to fill a knapsack of limited capacity with items so that the total value is as large as possible. Because we are allowed to take any fraction of an item, th...",
+      "passed": true
+    },
+    {
+      "id": "q24_comp_fractional_vs_01_knapsack",
+      "category": "cross_video_or_partial",
+      "query": "What is the difference between fractional knapsack and 0/1 knapsack?",
+      "status": "partially_answered",
+      "status_expected": [
+        "answered",
+        "partially_answered",
+        "insufficient_context"
+      ],
+      "status_ok": true,
+      "citations_count": 2,
+      "citations": [
+        {
+          "source_id": "S2",
+          "youtube_id": "F_DDzYnxO14",
+          "video_title": "Fractional Knapsack | Greedy Algorithms",
+          "start_seconds": 0.32,
+          "end_seconds": 88.479
+        },
+        {
+          "source_id": "S4",
+          "youtube_id": "F_DDzYnxO14",
+          "video_title": "Fractional Knapsack | Greedy Algorithms",
+          "start_seconds": 437.68,
+          "end_seconds": 526.959
+        }
+      ],
+      "answer_preview": "In the lecture the problem being solved is the **fractional knapsack**.  The key property highlighted is that you may take a *fraction* of an item \u2013 you can pick any weight up to the item's total weig...",
+      "passed": true
+    },
+    {
+      "id": "q45_part_knapsack_with_negative_weights",
+      "category": "partially_supported",
+      "query": "Can fractional knapsack be solved greedily if some items have negative weights?",
+      "status": "insufficient_context",
+      "status_expected": [
+        "partially_answered",
+        "insufficient_context"
+      ],
+      "status_ok": true,
+      "citations_count": 0,
+      "citations": [],
+      "answer_preview": "The provided lecture transcript explains the standard greedy approach for the fractional knapsack problem, including sorting items by value\u2011per\u2011weight, taking whole items while possible, and taking a ...",
+      "passed": true
+    },
+    {
+      "id": "q40_neg_dijkstra_shortest_path",
+      "category": "completely_unsupported",
+      "query": "How does Dijkstra algorithm find single-source shortest paths in weighted directed graphs?",
+      "status": "insufficient_context",
+      "status_expected": "insufficient_context",
+      "status_ok": true,
+      "citations_count": 0,
+      "citations": [],
+      "answer_preview": "The provided lecture transcript focuses on the Minimum Platforms problem using sorting and a two\u2011pointer greedy approach. It does not discuss Dijkstra's algorithm or how it finds single\u2011source shortes...",
+      "passed": true
+    }
+  ]
+}

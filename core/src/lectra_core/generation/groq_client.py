@@ -1,5 +1,7 @@
 """Reusable Groq API client with error mapping and credential protection."""
 
+import re
+import time
 from typing import Any, List, Optional
 
 import groq
@@ -66,63 +68,83 @@ class GroqClient:
             },
         )
 
-        try:
-            response = client.chat.completions.create(  # type: ignore[call-overload]
-                model=target_model,
-                messages=messages,  # type: ignore[arg-type]
-                temperature=temp,
-                response_format=fmt,  # type: ignore[arg-type]
-                timeout=self.settings.groq_timeout_seconds,
-            )
+        max_retries = 3
+        for attempt in range(max_retries + 1):
+            try:
+                response = client.chat.completions.create(  # type: ignore[call-overload]
+                    model=target_model,
+                    messages=messages,  # type: ignore[arg-type]
+                    temperature=temp,
+                    response_format=fmt,  # type: ignore[arg-type]
+                    timeout=self.settings.groq_timeout_seconds,
+                )
 
-            if not response.choices:
-                raise GroqClientError("Groq returned an empty choice list with no completions.")
+                if not response.choices:
+                    raise GroqClientError("Groq returned an empty choice list with no completions.")
 
-            choice = response.choices[0]
-            content = choice.message.content or ""
+                choice = response.choices[0]
+                content = choice.message.content or ""
 
-            # Ensure internal reasoning (if produced by reasoning models) is never exposed
-            return content.strip()
+                # Ensure internal reasoning (if produced by reasoning models) is never exposed
+                return content.strip()
 
-        except groq.AuthenticationError as exc:
-            logger.error("Groq authentication failed: invalid credentials")
-            raise GroqAuthError(
-                "Authentication failed with Groq. Please verify GROQ_API_KEY."
-            ) from exc
+            except groq.AuthenticationError as exc:
+                logger.error("Groq authentication failed: invalid credentials")
+                raise GroqAuthError(
+                    "Authentication failed with Groq. Please verify GROQ_API_KEY."
+                ) from exc
 
-        except groq.NotFoundError as exc:
-            logger.error("Groq model not found or unavailable", extra={"model": target_model})
-            raise GroqModelUnavailableError(
-                f"Configured model '{target_model}' is not available to this Groq account."
-            ) from exc
+            except groq.NotFoundError as exc:
+                logger.error("Groq model not found or unavailable", extra={"model": target_model})
+                raise GroqModelUnavailableError(
+                    f"Configured model '{target_model}' is not available to this Groq account."
+                ) from exc
 
-        except groq.RateLimitError as exc:
-            logger.warning("Groq rate limit encountered")
-            raise GroqRateLimitError(
-                "Groq API rate limit or quota exceeded. Please retry later."
-            ) from exc
+            except groq.RateLimitError as exc:
+                if attempt < max_retries:
+                    match = re.search(r"try again in ([0-9.]+)s", str(exc))
+                    wait_time = float(match.group(1)) + 0.5 if match else (3.0 * (attempt + 1))
+                    logger.warning(
+                        f"Groq rate limit encountered. Retrying in {wait_time:.1f}s "
+                        f"(attempt {attempt + 1}/{max_retries})",
+                        extra={"attempt": attempt + 1, "wait_time": wait_time},
+                    )
+                    time.sleep(wait_time)
+                    continue
 
-        except groq.APITimeoutError as exc:
-            logger.error(
-                "Groq API request timed out", extra={"timeout": self.settings.groq_timeout_seconds}
-            )
-            raise GroqTimeoutError(
-                f"Groq API call timed out after {self.settings.groq_timeout_seconds} seconds."
-            ) from exc
+                logger.warning("Groq rate limit encountered; retries exhausted")
+                raise GroqRateLimitError(
+                    "Groq API rate limit or quota exceeded. Please retry later."
+                ) from exc
 
-        except groq.APIConnectionError as exc:
-            logger.error("Groq API connection failure")
-            raise GroqClientError(
-                "Failed to connect to Groq API. Please check network connectivity."
-            ) from exc
+            except groq.APITimeoutError as exc:
+                logger.error(
+                    "Groq API request timed out",
+                    extra={"timeout": self.settings.groq_timeout_seconds},
+                )
+                raise GroqTimeoutError(
+                    f"Groq API call timed out after {self.settings.groq_timeout_seconds} seconds."
+                ) from exc
 
-        except groq.GroqError as exc:
-            logger.error("Groq API error encountered")
-            raise GroqClientError(f"Groq provider error: {exc.__class__.__name__}") from exc
+            except groq.APIConnectionError as exc:
+                logger.error("Groq API connection failure")
+                raise GroqClientError(
+                    "Failed to connect to Groq API. Please check network connectivity."
+                ) from exc
 
-        except GenerationError:
-            raise
+            except groq.GroqError as exc:
+                logger.error("Groq API error encountered")
+                raise GroqClientError(f"Groq provider error: {exc.__class__.__name__}") from exc
 
-        except Exception as exc:
-            logger.error("Unexpected error invoking Groq API")
-            raise GroqClientError("An unexpected error occurred communicating with Groq.") from exc
+            except GenerationError:
+                raise
+
+            except Exception as exc:
+                logger.error("Unexpected error invoking Groq API")
+                raise GroqClientError(
+                    "An unexpected error occurred communicating with Groq."
+                ) from exc
+
+        raise GenerationError(
+            "Unexpected error: generation loop completed without return or exception"
+        )

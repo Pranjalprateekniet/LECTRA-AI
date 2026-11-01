@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "timestamp": "2026-11-01T19:35:00Z",
+  "collection_name": "revision_chunks",
+  "sqlite_chunk_count": 56,
+  "qdrant_point_count": 56,
+  "counts_agree": true,
+  "vector_dimension_configured": 768,
+  "distance_metric": "Cosine",
+  "missing_in_qdrant_count": 0,
+  "orphan_in_qdrant_count": 0,
+  "vector_dimension_failures_count": 0,
+  "normalization_failures_count": 0,
+  "metadata_mismatches_count": 0,
+  "timestamp_mismatches_count": 0,
+  "details": {
+    "missing_in_qdrant": [],
+    "orphan_in_qdrant": [],
+    "vector_dimension_failures": [],
+    "normalization_failures": [],
+    "metadata_mismatches": [],
+    "timestamp_mismatches": []
+  }
+}
