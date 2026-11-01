@@ -1,0 +1,651 @@
+[
+  {
+    "id": "q01_concept_greedy_choice",
+    "query": "Why do we sort meetings by end time rather than start time in the meeting room problem?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "e7e989bc-7335-5aa2-a9da-4bb35840a035",
+      "8750eea6-acc3-5c49-9ab4-f13dcf227999"
+    ],
+    "is_negative": false,
+    "notes": "Explains selecting shortest finishing time to leave maximum room for future meetings.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q02_concept_knapsack_ratio",
+    "query": "Why is value per unit weight used to choose items in fractional knapsack?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "f9d5d93f-ed94-53e8-9c10-540f906aac4f",
+      "9256dd15-38af-5eed-b6b1-29aad5c2b2c3"
+    ],
+    "is_negative": false,
+    "notes": "Greedy choice property of fractional knapsack sorting by value/weight.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q03_concept_platforms_arrival_departure",
+    "query": "Why can arrival and departure times be sorted separately in the minimum platforms problem?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "0399a0f1-29d1-5900-9926-22c10ca4cffc",
+      "b0a20577-614d-5983-b081-6d45cd0e7f00"
+    ],
+    "is_negative": false,
+    "notes": "Independent sorting works because we only need to track instantaneous occupancy.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q04_concept_job_deadline_day",
+    "query": "Why should a job with a given deadline be executed as late as possible?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "51ae027e-b94b-534e-96ab-136b9e6f83f1",
+      "49bc4cc8-b23a-5c68-8b1b-a1cc819d826d"
+    ],
+    "is_negative": false,
+    "notes": "Performing at the latest possible slot leaves earlier slots open for stricter deadlines.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q05_concept_coins_greedy_failure",
+    "query": "When does the greedy approach fail for finding minimum coins?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "b332aac0-e3d3-5dfa-a88b-ed5fb339e4ef"
+    ],
+    "is_negative": false,
+    "notes": "Discussion on non-canonical coin denominations where greedy fails and DP is needed.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q06_concept_platform_occupancy",
+    "query": "How does train arrival and departure change the number of active platforms at a railway station?",
+    "category": "conceptual",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "0bc78c30-4ba8-5657-86a4-31e4d033b4a4",
+      "47502158-b537-5a25-98ee-16c8dbca1385"
+    ],
+    "is_negative": false,
+    "notes": "Arrival increments platform count, departure decrements platform count.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q07_algo_two_pointer_platforms",
+    "query": "How does the two-pointer approach work for finding the minimum number of platforms?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "7a238c5b-eadf-5917-9ad5-9401f10961f0",
+      "4a7f6ef1-d6cb-5844-a6a9-b8f7d4dfd220"
+    ],
+    "is_negative": false,
+    "notes": "Two pointers i for arrival and j for departure tracking max simultaneous trains.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q08_algo_meetings_loop",
+    "query": "How do we iterate through sorted meetings and update the end limit?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "cd6bad07-c669-58c2-b8a2-98f1f520ddad",
+      "5ef79a92-ae0b-57e1-b01d-13fddc481aa1"
+    ],
+    "is_negative": false,
+    "notes": "Comparing meeting start time against current limit and updating limit.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q09_algo_fractional_remainder",
+    "query": "How do you calculate the fractional value when an item cannot fit completely into the knapsack?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "970eab30-61d0-561c-b79c-3ccdb4ee3237",
+      "a0ebb9f7-cfab-5534-86ca-f9f4ea5404f7"
+    ],
+    "is_negative": false,
+    "notes": "Taking remaining weight divided by total item weight multiplied by item value.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q10_algo_job_sequencing_array",
+    "query": "How is the slot array initialized and used in job sequencing?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "48363c24-584a-50f4-a4b9-ba5ba1934876",
+      "ef2e7f56-9d96-5d03-809f-3f1eb4a4dc0e"
+    ],
+    "is_negative": false,
+    "notes": "Slot array of size max_deadline initialized with -1, checking backwards.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q11_algo_coins_greedy_loop",
+    "query": "How do we iterate over the coin denominations array to make change?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "a7ab19cb-cc86-581f-8987-fac196f7deb8"
+    ],
+    "is_negative": false,
+    "notes": "Iterating backwards from highest denomination n-1 down to 0 with while loop.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q12_algo_meeting_comparator",
+    "query": "How should the custom comparator be implemented to sort meetings in C++ or Java?",
+    "category": "algorithm_explanation",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "453289bf-92e0-577c-8ca4-e2c91dd803f3",
+      "ed17a080-5ac4-5f72-b6f5-8d6d07b8ab91"
+    ],
+    "is_negative": false,
+    "notes": "Comparator comparing end times, tie-breaking using position index.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q13_complexity_platforms",
+    "query": "What is the time complexity and space complexity of finding the minimum railway platforms?",
+    "category": "complexity",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "4a7f6ef1-d6cb-5844-a6a9-b8f7d4dfd220"
+    ],
+    "is_negative": false,
+    "notes": "O(2N log N) sorting + O(2N) pointers, O(1) auxiliary space.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q14_complexity_job_sequencing",
+    "query": "What is the time complexity of the job sequencing algorithm?",
+    "category": "complexity",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "7a582a97-cb18-5e39-ab3c-47f0909f1cde"
+    ],
+    "is_negative": false,
+    "notes": "O(N log N) sorting + O(N * max_deadline) slot assignment.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q15_complexity_fractional_knapsack",
+    "query": "What is the time complexity of the fractional knapsack algorithm?",
+    "category": "complexity",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "b864957c-feaa-5f95-b29a-890e3b6d439e"
+    ],
+    "is_negative": false,
+    "notes": "O(N log N) for sorting value-to-weight ratio + O(N) for linear pass.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q16_complexity_meetings",
+    "query": "What is the space complexity and time complexity of solving N meetings in one room?",
+    "category": "complexity",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "41de82ec-97f6-5313-9b87-78c8f3e6f8be"
+    ],
+    "is_negative": false,
+    "notes": "O(N log N) time for sorting meetings, O(N) space for meeting data structure.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q17_complexity_coins",
+    "query": "What is the time complexity of the greedy coin change algorithm?",
+    "category": "complexity",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "ef5e12e7-4019-5a0e-a6f9-41e8507e7055"
+    ],
+    "is_negative": false,
+    "notes": "O(V) worst-case or bounded by denomination count.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q18_example_coins_49",
+    "query": "How is the greedy coin algorithm applied to make change for 49 rupees?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "cb1e9991-091e-5186-a8fb-d553d5b3f119",
+      "53026dda-d66e-59a8-b5aa-3628194c34b9"
+    ],
+    "is_negative": false,
+    "notes": "Detailed walkthrough of value 49 using 20 + 20 + 5 + 2 + 2.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q19_example_coins_87",
+    "query": "What coins are selected for the value 87 in the minimum coins problem?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "4a26ec97-aa17-57bc-aa5a-99c287c80e2a"
+    ],
+    "is_negative": false,
+    "notes": "Value 87 example using 50 + 20 + 10 + 5 + 2.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q20_example_platforms_train_intervals",
+    "query": "In the minimum platforms example, how do trains arriving at 900 and departing at 910 get processed?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "08f53cad-4a01-5695-a8f0-9f4b37875603",
+      "7681be17-5a11-5de7-9dca-edc590acf890"
+    ],
+    "is_negative": false,
+    "notes": "Concrete walkthrough with arrival/departure train times.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q21_example_knapsack_weight_50",
+    "query": "In the fractional knapsack example with knapsack capacity 50, which items are chosen?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "9256dd15-38af-5eed-b6b1-29aad5c2b2c3",
+      "970eab30-61d0-561c-b79c-3ccdb4ee3237"
+    ],
+    "is_negative": false,
+    "notes": "Knapsack weight 50 example with item weights 10, 20, 30 and values 60, 100, 120.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q22_example_job_deadlines",
+    "query": "In job sequencing, if a job has deadline 2 and profit 100, which day should it be placed on?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "49bc4cc8-b23a-5c68-8b1b-a1cc819d826d",
+      "48363c24-584a-50f4-a4b9-ba5ba1934876"
+    ],
+    "is_negative": false,
+    "notes": "Placing on day 2 rather than day 1.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q23_example_meetings_order",
+    "query": "How are meetings ordered when meeting one has start 1 and end 2 and meeting two has start 3 and end 4?",
+    "category": "example_based",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "e7e989bc-7335-5aa2-a9da-4bb35840a035",
+      "9f466ae5-539f-5755-9b0c-b892c88dbe31"
+    ],
+    "is_negative": false,
+    "notes": "Walkthrough with meeting triplets (start, end, pos).",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q24_comp_fractional_vs_01_knapsack",
+    "query": "What is the difference between fractional knapsack and 0/1 knapsack?",
+    "category": "comparison",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "70f39599-429d-563d-8ce4-7d380b64a0f9"
+    ],
+    "is_negative": false,
+    "notes": "Fractional knapsack is taught in video F_DDzYnxO14; 0/1 knapsack is absent from the transcript, so the fractional part is explained and the missing 0/1 part is acknowledged.",
+    "expected_status": "partially_answered"
+  },
+  {
+    "id": "q25_comp_coins_greedy_vs_dp",
+    "query": "Why does the Indian currency system allow a greedy approach whereas other denomination systems require dynamic programming?",
+    "category": "comparison",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "b332aac0-e3d3-5dfa-a88b-ed5fb339e4ef"
+    ],
+    "is_negative": false,
+    "notes": "Comparison between greedy choice property in canonical systems vs general coin change DP.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q26_comp_job_sequencing_vs_meetings",
+    "query": "How does job sequencing with deadlines differ from scheduling non-overlapping meetings?",
+    "category": "comparison",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs",
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "9b1ccc2a-d2b1-5b17-aa6a-c3cad6ec7ad0",
+      "e7e989bc-7335-5aa2-a9da-4bb35840a035"
+    ],
+    "is_negative": false,
+    "notes": "Meetings have fixed start and end intervals; jobs can be performed anytime before deadline.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q27_comp_sorting_arrival_vs_departure",
+    "query": "In minimum platforms, why is sorting arrival times alone not sufficient compared to sorting both arrivals and departures?",
+    "category": "comparison",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "0399a0f1-29d1-5900-9926-22c10ca4cffc"
+    ],
+    "is_negative": false,
+    "notes": "Must know departures to know when platforms are released.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q28_comp_meetings_start_vs_end_sort",
+    "query": "What happens if you sort meetings by start time instead of finish time?",
+    "category": "comparison",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "The lecture explains why meetings are sorted by finishing time, but does not discuss or demonstrate what happens if sorted by start time instead.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q29_problem_indian_denominations",
+    "query": "What are the available coin and note denominations in the minimum coins problem?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "ef0785a9-6bf5-55d1-bade-e721580c9a1b",
+      "4a26ec97-aa17-57bc-aa5a-99c287c80e2a"
+    ],
+    "is_negative": false,
+    "notes": "Lists 1, 2, 5, 10, 20, 50, 100, 500, 1000.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q30_problem_meetings_one_based_index",
+    "query": "Does the N meetings in one room problem require 1-based indexing for meeting numbers?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "8e14746e-b715-52c2-9837-b46ce5c2738b",
+      "e60253c6-2a21-5587-809e-956b3328c629"
+    ],
+    "is_negative": false,
+    "notes": "Specifies tracking 1-based meeting order.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q31_problem_job_max_deadline",
+    "query": "How do you determine the maximum deadline in job sequencing to size the schedule array?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "48363c24-584a-50f4-a4b9-ba5ba1934876",
+      "27854569-11ac-5517-b6e0-10cc601024ad"
+    ],
+    "is_negative": false,
+    "notes": "Scanning all jobs to find the maximum deadline value.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q32_problem_knapsack_item_structure",
+    "query": "What attributes does an item have in the fractional knapsack problem?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "9133f4ee-7f12-5c24-a99e-081ef4e62c20",
+      "987dba34-ea55-5b7b-80be-892d8a206d92"
+    ],
+    "is_negative": false,
+    "notes": "Item structure containing value and weight.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q33_problem_platform_initialization",
+    "query": "How are the platform count and result variables initialized in minimum platforms?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "7a238c5b-eadf-5917-9ad5-9401f10961f0"
+    ],
+    "is_negative": false,
+    "notes": "Initializing platform count to 1 and result to 1.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q34_problem_tie_breaker_meetings",
+    "query": "What is the tie-breaking rule if two meetings have the exact same ending time?",
+    "category": "problem_specific",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "453289bf-92e0-577c-8ca4-e2c91dd803f3",
+      "ed17a080-5ac4-5f72-b6f5-8d6d07b8ab91"
+    ],
+    "is_negative": false,
+    "notes": "Sorting by meeting position index when end times are equal.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q35_synonym_non_conflicting_events",
+    "query": "How to schedule maximum non-conflicting activities in a conference hall?",
+    "category": "alternate_wording",
+    "expected_youtube_ids": [
+      "II6ziNnub1Q"
+    ],
+    "expected_chunk_ids": [
+      "2c3f500d-ffdd-5d93-b7a0-b89539f5c4b2",
+      "e7e989bc-7335-5aa2-a9da-4bb35840a035"
+    ],
+    "is_negative": false,
+    "notes": "Synonym query for Activity Selection / N meetings.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q36_synonym_railway_tracks",
+    "query": "How to calculate the minimum railway tracks needed to avoid train collisions?",
+    "category": "alternate_wording",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "9b0cc7dc-8e4f-5422-8af1-17ad01a7c06d",
+      "08f53cad-4a01-5695-a8f0-9f4b37875603"
+    ],
+    "is_negative": false,
+    "notes": "Synonym query for Minimum Platforms.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q37_synonym_continuous_knapsack",
+    "query": "What is the optimal strategy for the continuous knapsack problem?",
+    "category": "alternate_wording",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "9133f4ee-7f12-5c24-a99e-081ef4e62c20",
+      "f9d5d93f-ed94-53e8-9c10-540f906aac4f"
+    ],
+    "is_negative": false,
+    "notes": "Synonym query for Fractional Knapsack.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q38_synonym_task_scheduling_profit",
+    "query": "How to maximize reward when scheduling tasks with expiration times?",
+    "category": "alternate_wording",
+    "expected_youtube_ids": [
+      "LjPx4wQaRIs"
+    ],
+    "expected_chunk_ids": [
+      "fb287341-ffe8-5756-b8f6-8a5c8aa6845f",
+      "51ae027e-b94b-534e-96ab-136b9e6f83f1"
+    ],
+    "is_negative": false,
+    "notes": "Synonym query for Job Sequencing.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q39_synonym_cash_dispenser",
+    "query": "How does an ATM dispense currency notes greedily to minimize the count of bills?",
+    "category": "alternate_wording",
+    "expected_youtube_ids": [
+      "mVg9CfJvayM"
+    ],
+    "expected_chunk_ids": [
+      "ef0785a9-6bf5-55d1-bade-e721580c9a1b",
+      "cb1e9991-091e-5186-a8fb-d553d5b3f119"
+    ],
+    "is_negative": false,
+    "notes": "Real-world synonym query for Minimum Coins.",
+    "expected_status": "answered"
+  },
+  {
+    "id": "q40_neg_dijkstra_shortest_path",
+    "query": "How does Dijkstra algorithm find single-source shortest paths in weighted directed graphs?",
+    "category": "negative_out_of_domain",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "Graph shortest paths topic absent from the 5 indexed Greedy videos.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q41_neg_topological_sort",
+    "query": "How do you detect a cycle in a directed graph using Kahn algorithm with in-degrees?",
+    "category": "negative_out_of_domain",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "Topological sorting graph topic absent from the 5 indexed videos.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q42_neg_01_knapsack_dp",
+    "query": "How to write the 2D dynamic programming recurrence relation for the 0/1 knapsack problem?",
+    "category": "negative_out_of_domain",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "0/1 Knapsack DP recurrence absent; only Fractional Knapsack greedy is indexed.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q43_neg_trie_prefix_tree",
+    "query": "How to implement insert and search operations in a Trie prefix tree?",
+    "category": "negative_out_of_domain",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "Trie data structures absent from the 5 indexed videos.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q44_neg_kadane_max_subarray",
+    "query": "What is Kadane algorithm for finding the maximum contiguous subarray sum in linear time?",
+    "category": "negative_out_of_domain",
+    "expected_youtube_ids": [],
+    "expected_chunk_ids": [],
+    "is_negative": true,
+    "notes": "Kadane algorithm absent from the 5 indexed videos.",
+    "expected_status": "insufficient_context"
+  },
+  {
+    "id": "q_part_01_knapsack_greedy_and_dp",
+    "query": "Explain the fractional knapsack greedy algorithm and also provide the 2D dynamic programming recurrence relation for 0/1 knapsack.",
+    "category": "partially_supported",
+    "expected_youtube_ids": [
+      "F_DDzYnxO14"
+    ],
+    "expected_chunk_ids": [
+      "9133f4ee-7f12-5c24-a99e-081ef4e62c20",
+      "f9d5d93f-ed94-53e8-9c10-540f906aac4f"
+    ],
+    "is_negative": false,
+    "expected_status": "partially_answered",
+    "notes": "Fractional knapsack greedy is taught in F_DDzYnxO14, but 0/1 knapsack DP recurrence is not covered in the lecture."
+  },
+  {
+    "id": "q_part_02_platforms_and_toposort",
+    "query": "How do you calculate the minimum number of railway platforms using arrival and departure times, and how does Kahn algorithm perform topological sorting?",
+    "category": "partially_supported",
+    "expected_youtube_ids": [
+      "dxVcMDI7vyI"
+    ],
+    "expected_chunk_ids": [
+      "0399a0f1-29d1-5900-9926-22c10ca4cffc",
+      "7a238c5b-eadf-5917-9ad5-9401f10961f0"
+    ],
+    "is_negative": false,
+    "expected_status": "partially_answered",
+    "notes": "Minimum platforms algorithm is taught in dxVcMDI7vyI, but Kahn algorithm for topological sorting is not in the dataset."
+  }
+]

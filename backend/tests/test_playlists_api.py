@@ -175,3 +175,82 @@ def test_get_nonexistent_playlist_and_job(client):
     tc, _ = client
     assert tc.get("/api/v1/playlists/does-not-exist").status_code == 404
     assert tc.get("/api/v1/jobs/does-not-exist").status_code == 404
+
+
+def test_playlist_activity_and_video_details(client):
+    tc, settings = client
+    from lectra_core.db.models import ProcessingStage, VideoChunk
+
+    with next(get_db(settings)) as session:
+        pl = Playlist(
+            youtube_id="PL_act_test",
+            url="https://www.youtube.com/playlist?list=PL_act_test",
+            title="Activity Test Playlist",
+            status="DISCOVERY_COMPLETED",
+            video_count=1,
+        )
+        session.add(pl)
+        session.flush()
+
+        v = Video(
+            playlist_id=pl.id,
+            youtube_id="vid_act_1",
+            title="Video 1",
+            url="https://www.youtube.com/watch?v=vid_act_1",
+            status="INDEXED",
+            position=0,
+        )
+        session.add(v)
+        session.flush()
+
+        stage = ProcessingStage(
+            video_id=v.id,
+            stage_name="TRANSCRIPT_ACQUISITION",
+            status="COMPLETED",
+            attempts=1,
+        )
+        session.add(stage)
+
+        chunk = VideoChunk(
+            id="chk_act_1",
+            video_id=v.id,
+            chunk_index=0,
+            start_seconds=0.0,
+            end_seconds=10.0,
+            duration_seconds=10.0,
+            text="Test chunk",
+            token_count=5,
+            source_segment_start_index=0,
+            source_segment_end_index=0,
+        )
+        session.add(chunk)
+        session.commit()
+        pl_id = pl.id
+        vid_id = v.id
+
+    # 1. Activity log check
+    act_res = tc.get(f"/api/v1/playlists/{pl_id}/activity")
+    assert act_res.status_code == 200
+    events = act_res.json()
+    assert len(events) >= 2  # creation + stage
+    assert any("TRANSCRIPT_ACQUISITION" in e["stage"] for e in events)
+
+    # 2. Video details check
+    vid_res = tc.get(f"/api/v1/playlists/{pl_id}/videos")
+    assert vid_res.status_code == 200
+    v_data = vid_res.json()
+    assert len(v_data) == 1
+    assert v_data[0]["chunks_count"] == 1
+    assert v_data[0]["indexed_vectors_count"] == 1
+    assert len(v_data[0]["stages"]) == 1
+    assert v_data[0]["stages"][0]["stage_name"] == "TRANSCRIPT_ACQUISITION"
+
+    # 3. Retry playlist check
+    retry_pl_res = tc.post(f"/api/v1/playlists/{pl_id}/retry")
+    assert retry_pl_res.status_code == 200
+    assert retry_pl_res.json()["success"] is True
+
+    # 4. Retry video check
+    retry_v_res = tc.post(f"/api/v1/playlists/videos/{vid_id}/retry")
+    assert retry_v_res.status_code == 200
+    assert retry_v_res.json()["success"] is True

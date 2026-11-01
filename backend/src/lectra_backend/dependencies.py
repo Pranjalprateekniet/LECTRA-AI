@@ -5,6 +5,7 @@ from collections.abc import Generator
 from fastapi import Depends
 from lectra_core.config import Settings, get_settings
 from lectra_core.db.session import get_db
+from lectra_core.generation.service import GenerationService
 from lectra_core.retrieval.service import RetrievalService
 from sqlalchemy.orm import Session
 
@@ -19,3 +20,10 @@ def get_retrieval_service(
 ) -> RetrievalService:
     """Provide a retrieval service instance bound to active settings."""
     return RetrievalService(settings=settings)
+
+
+def get_generation_service(
+    settings: Settings = Depends(get_settings),
+) -> GenerationService:
+    """Provide a generation service instance bound to active settings."""
+    return GenerationService(settings=settings)

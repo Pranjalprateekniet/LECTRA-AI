@@ -108,11 +108,24 @@ class Settings(BaseSettings):
     translation_source_lang: str = "hi"
     translation_target_lang: str = "en"
 
-    # LLM Provider
+    # LLM Provider — Phase 7
     llm_provider: Literal["groq", "gpt-oss"] = "groq"
-    llm_model: str = "llama-3.3-70b-versatile"
+    llm_model: str = "openai/gpt-oss-120b"
     llm_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     groq_api_key: Optional[str] = None
+    groq_model_name: str = "openai/gpt-oss-120b"
+    groq_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    groq_timeout_seconds: float = Field(default=30.0, ge=1.0)
+    groq_max_context_tokens: int = Field(default=8192, ge=512)
+    groq_reserved_output_tokens: int = Field(default=1024, ge=128)
+
+    @field_validator("groq_api_key", mode="before")
+    @classmethod
+    def validate_groq_api_key(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = str(v).strip()
+        return v if v else None
 
     # Worker Settings
     worker_concurrency: int = Field(default=1, ge=1)
