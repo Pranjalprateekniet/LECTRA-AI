@@ -17,4 +17,3 @@ def count_tokens(text: str, model_name: Optional[str] = None) -> int:
     # Matches words, numbers, and individual punctuation marks
     tokens = re.findall(r"\w+|[^\w\s]", text)
     return max(1, len(tokens))
-

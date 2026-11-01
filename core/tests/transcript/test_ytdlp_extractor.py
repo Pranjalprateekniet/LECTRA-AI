@@ -15,7 +15,8 @@ from lectra_core.transcript.ytdlp_extractor import (
 # ---------------------------------------------------------------------------
 
 
-def test_select_best_track_prefers_manual_over_auto():
+def test_select_best_track_prefers_auto_english_as_primary():
+    """English auto-generated captions are preferred as the primary source."""
     subtitles = {
         "en": [{"ext": "json3", "url": "https://sub.test/manual_en"}],
     }
@@ -27,28 +28,26 @@ def test_select_best_track_prefers_manual_over_auto():
         subtitles=subtitles,
         automatic_captions=automatic,
         preferred_languages=["en"],
-        prefer_manual=True,
     )
-    assert source == "manual"
+    assert source == "generated"
     assert lang == "en"
-    assert formats[0]["url"] == "https://sub.test/manual_en"
+    assert formats[0]["url"] == "https://sub.test/auto_en"
 
 
-def test_select_best_track_uses_auto_when_manual_absent():
-    subtitles = {}
-    automatic = {
-        "en": [{"ext": "json3", "url": "https://sub.test/auto_en"}],
+def test_select_best_track_uses_manual_when_auto_absent():
+    subtitles = {
+        "en": [{"ext": "json3", "url": "https://sub.test/manual_en"}],
     }
+    automatic = {}
 
     formats, lang, source = select_best_track(
         subtitles=subtitles,
         automatic_captions=automatic,
         preferred_languages=["en"],
-        prefer_manual=True,
     )
-    assert source == "generated"
+    assert source == "manual"
     assert lang == "en"
-    assert formats[0]["url"] == "https://sub.test/auto_en"
+    assert formats[0]["url"] == "https://sub.test/manual_en"
 
 
 def test_select_best_track_matches_en_us_prefix():
@@ -69,12 +68,12 @@ def test_select_best_track_matches_en_us_prefix():
 
 
 # ---------------------------------------------------------------------------
-# select_best_track — English-only restriction (no non-English fallback)
+# select_best_track — Captions-first priority and multi-language support
 # ---------------------------------------------------------------------------
 
 
-def test_select_best_track_returns_none_when_only_other_languages_available():
-    """When only Hindi / Spanish / etc. are available, returns None (not English)."""
+def test_select_best_track_selects_hindi_when_english_unavailable():
+    """When English captions are unavailable, selects best available Hindi caption track."""
     subtitles = {
         "es": [{"ext": "json3", "url": "https://sub.test/manual_es"}],
     }
@@ -86,9 +85,12 @@ def test_select_best_track_returns_none_when_only_other_languages_available():
         subtitles=subtitles,
         automatic_captions=automatic,
         preferred_languages=["en"],
-        prefer_manual=True,
     )
-    assert result is None
+    assert result is not None
+    formats, lang, source = result
+    assert lang == "hi"
+    assert source == "generated"
+    assert formats[0]["url"] == "https://sub.test/auto_hi"
 
 
 def test_select_best_track_no_captions_returns_none():
@@ -96,20 +98,19 @@ def test_select_best_track_no_captions_returns_none():
         subtitles={},
         automatic_captions={},
         preferred_languages=["en"],
-        prefer_manual=True,
     )
     assert result is None
 
 
-def test_select_best_track_hindi_only_auto_returns_none():
-    """Hindi-only auto-generated captions must not be returned for English-only config."""
+def test_select_best_track_returns_none_when_non_english_explicitly_disallowed():
+    """Hindi-only auto-generated captions return None when allow_non_english=False."""
     result = select_best_track(
         subtitles={},
         automatic_captions={
             "hi": [{"ext": "json3", "url": "https://sub.test/hi"}],
         },
         preferred_languages=["en"],
-        prefer_manual=True,
+        allow_non_english=False,
     )
     assert result is None
 

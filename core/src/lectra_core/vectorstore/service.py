@@ -83,10 +83,21 @@ class IndexingService:
             "youtube_url": f"https://www.youtube.com/watch?v={video.youtube_id}&t={int(chunk.start_seconds)}",
         }
 
-    def index_video(
-        self, session: Session, video: Video, force: bool = False
-    ) -> IndexingResult:
+    def index_video(self, session: Session, video: Video, force: bool = False) -> IndexingResult:
         """Index all chunks of a video into Qdrant idempotently with verification."""
+        # Check race condition: video was deleted
+        if session.get(Video, video.id) is None:
+            logger.info(
+                "Video was deleted; skipping indexing", extra={"video_id": video.youtube_id}
+            )
+            return IndexingResult(
+                video_id=video.id,
+                youtube_id=video.youtube_id,
+                chunks_indexed=0,
+                status="DELETED",
+                verified_points=0,
+            )
+
         stage = self._get_or_create_stage(session, video.id)
         stage.status = "IN_PROGRESS"
         stage.attempts += 1
@@ -157,7 +168,20 @@ class IndexingService:
                 for chunk, vector in zip(chunks, vectors)
             ]
 
-            # 4. Batch upsert into Qdrant
+            # 4. Check race condition before batch upsert into Qdrant
+            if session.get(Video, video.id) is None:
+                logger.info(
+                    "Video was deleted during embedding; skipping Qdrant upsert",
+                    extra={"video_id": video.youtube_id},
+                )
+                return IndexingResult(
+                    video_id=video.id,
+                    youtube_id=video.youtube_id,
+                    chunks_indexed=0,
+                    status="DELETED",
+                    verified_points=0,
+                )
+
             self.vector_store.upsert_points(points)
 
             # 5. Verify ingestion via point retrieval

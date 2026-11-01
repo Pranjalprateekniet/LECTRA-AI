@@ -60,4 +60,3 @@ def test_retrieval_filter_schema_whitespace_stripping():
     assert rf.playlist_id == "pl_1"
     assert rf.video_id is None
     assert rf.youtube_id is None
-

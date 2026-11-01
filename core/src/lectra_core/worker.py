@@ -6,7 +6,7 @@ import sys
 import time
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from lectra_core.config import Settings, get_settings
@@ -105,6 +105,10 @@ class IngestionWorker:
 
     def process_job(self, session: Session, job: Job) -> None:
         """Process a claimed job."""
+        if job.status == "CANCELLED":
+            logger.info("Job was cancelled; skipping execution", extra={"job_id": job.id})
+            return
+
         logger.info(
             "Processing job",
             extra={"job_id": job.id, "job_type": job.job_type},
@@ -191,6 +195,48 @@ class IngestionWorker:
         service = TranscriptService(settings=self.settings)
         result = service.extract_for_playlist(session, playlist_id)
 
+        # Enqueue downstream chunking job if any videos are ready and no active chunk job exists
+        ready_videos_count = (
+            session.scalar(
+                select(func.count(Video.id)).where(
+                    Video.playlist_id == playlist_id,
+                    Video.status == "TRANSCRIPT_READY",
+                )
+            )
+            or 0
+        )
+        if ready_videos_count > 0:
+            active_chunk_jobs = session.scalars(
+                select(Job).where(
+                    Job.job_type == CHUNK_PLAYLIST_JOB_TYPE,
+                    Job.status.in_(["QUEUED", "RUNNING"]),
+                    Job.id != job.id,
+                )
+            ).all()
+            already_active = any(
+                (j.payload or {}).get("playlist_id") == playlist_id for j in active_chunk_jobs
+            )
+            if not already_active:
+                chunk_job = Job(
+                    job_type=CHUNK_PLAYLIST_JOB_TYPE,
+                    status="QUEUED",
+                    max_retries=self.settings.worker_max_retries,
+                    payload={
+                        "playlist_id": playlist_id,
+                        "youtube_id": payload.get("youtube_id"),
+                    },
+                )
+                session.add(chunk_job)
+                session.commit()
+                logger.info(
+                    "Enqueued downstream chunking job for playlist",
+                    extra={
+                        "job_id": chunk_job.id,
+                        "playlist_id": playlist_id,
+                        "ready_videos": ready_videos_count,
+                    },
+                )
+
         if result.failed > 0:
             raise RuntimeError(f"{result.failed} video(s) failed transcript extraction")
 
@@ -201,12 +247,42 @@ class IngestionWorker:
             raise ValueError("Job payload is missing 'video_id'.")
         video = session.get(Video, video_id)
         if not video:
-            raise ValueError(f"Video '{video_id}' not found.")
+            logger.info(
+                "Video was deleted; skipping transcript extraction", extra={"video_id": video_id}
+            )
+            return
 
         service = TranscriptService(settings=self.settings)
         summary = service.process_video(session, video)
         if summary.status == "EXTRACTION_FAILED":
             raise RuntimeError(f"Video transcript extraction failed: {summary.error_detail}")
+
+        # Check if video reached TRANSCRIPT_READY; if so, chain into CHUNK_VIDEO_JOB_TYPE
+        session.refresh(video)
+        if video.status == "TRANSCRIPT_READY":
+            active_chunk_jobs = session.scalars(
+                select(Job).where(
+                    Job.job_type == CHUNK_VIDEO_JOB_TYPE,
+                    Job.status.in_(["QUEUED", "RUNNING"]),
+                    Job.id != job.id,
+                )
+            ).all()
+            already_active = any(
+                (j.payload or {}).get("video_id") == video.id for j in active_chunk_jobs
+            )
+            if not already_active:
+                chunk_job = Job(
+                    job_type=CHUNK_VIDEO_JOB_TYPE,
+                    status="QUEUED",
+                    max_retries=self.settings.worker_max_retries,
+                    payload={"video_id": video.id, "youtube_id": video.youtube_id},
+                )
+                session.add(chunk_job)
+                session.commit()
+                logger.info(
+                    "Enqueued downstream chunking job for video",
+                    extra={"job_id": chunk_job.id, "video_id": video.id},
+                )
 
     def _process_chunk_video_job(self, session: Session, job: Job) -> None:
         payload = job.payload or {}
@@ -215,12 +291,41 @@ class IngestionWorker:
             raise ValueError("Job payload is missing 'video_id'.")
         video = session.get(Video, video_id)
         if not video:
-            raise ValueError(f"Video '{video_id}' not found.")
+            logger.info("Video was deleted; skipping chunking", extra={"video_id": video_id})
+            return
 
         from lectra_core.chunking.service import ChunkingService
 
         service = ChunkingService(settings=self.settings)
         service.chunk_video(session, video)
+        session.commit()
+
+        # Check if video reached CHUNKED; if so, chain into INDEX_VIDEO_JOB_TYPE
+        session.refresh(video)
+        if video.status == "CHUNKED":
+            active_index_jobs = session.scalars(
+                select(Job).where(
+                    Job.job_type == INDEX_VIDEO_JOB_TYPE,
+                    Job.status.in_(["QUEUED", "RUNNING"]),
+                    Job.id != job.id,
+                )
+            ).all()
+            already_active = any(
+                (j.payload or {}).get("video_id") == video.id for j in active_index_jobs
+            )
+            if not already_active:
+                index_job = Job(
+                    job_type=INDEX_VIDEO_JOB_TYPE,
+                    status="QUEUED",
+                    max_retries=self.settings.worker_max_retries,
+                    payload={"video_id": video.id, "youtube_id": video.youtube_id},
+                )
+                session.add(index_job)
+                session.commit()
+                logger.info(
+                    "Enqueued downstream indexing job for video",
+                    extra={"job_id": index_job.id, "video_id": video.id},
+                )
 
     def _process_chunk_playlist_job(self, session: Session, job: Job) -> None:
         payload = job.payload or {}
@@ -237,9 +342,69 @@ class IngestionWorker:
                 Video.status == "TRANSCRIPT_READY",
             )
         ).all()
+        failed_count = 0
         for v in videos:
-            service.chunk_video(session, v)
-            session.commit()
+            if session.get(Video, v.id) is None:
+                continue
+            try:
+                service.chunk_video(session, v)
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                failed_count += 1
+                logger.error(
+                    "Failed to chunk video",
+                    extra={"video_id": v.youtube_id, "error": str(e)},
+                )
+                stage = service._get_or_create_stage(session, v.id)
+                stage.status = "FAILED"
+                stage.error_detail = str(e)[:500]
+                session.commit()
+
+        # Enqueue downstream indexing job if any videos are chunked and no active index job exists
+        chunked_count = (
+            session.scalar(
+                select(func.count(Video.id)).where(
+                    Video.playlist_id == playlist_id,
+                    Video.status == "CHUNKED",
+                )
+            )
+            or 0
+        )
+        if chunked_count > 0:
+            active_index_jobs = session.scalars(
+                select(Job).where(
+                    Job.job_type == INDEX_PLAYLIST_JOB_TYPE,
+                    Job.status.in_(["QUEUED", "RUNNING"]),
+                    Job.id != job.id,
+                )
+            ).all()
+            already_active = any(
+                (j.payload or {}).get("playlist_id") == playlist_id for j in active_index_jobs
+            )
+            if not already_active:
+                index_job = Job(
+                    job_type=INDEX_PLAYLIST_JOB_TYPE,
+                    status="QUEUED",
+                    max_retries=self.settings.worker_max_retries,
+                    payload={
+                        "playlist_id": playlist_id,
+                        "youtube_id": payload.get("youtube_id"),
+                    },
+                )
+                session.add(index_job)
+                session.commit()
+                logger.info(
+                    "Enqueued downstream indexing job for playlist",
+                    extra={
+                        "job_id": index_job.id,
+                        "playlist_id": playlist_id,
+                        "chunked_videos": chunked_count,
+                    },
+                )
+
+        if failed_count > 0:
+            raise RuntimeError(f"{failed_count} video(s) failed chunking")
 
     def _process_index_video_job(self, session: Session, job: Job) -> None:
         payload = job.payload or {}
@@ -248,7 +413,8 @@ class IngestionWorker:
             raise ValueError("Job payload is missing 'video_id'.")
         video = session.get(Video, video_id)
         if not video:
-            raise ValueError(f"Video '{video_id}' not found.")
+            logger.info("Video was deleted; skipping indexing", extra={"video_id": video_id})
+            return
 
         from lectra_core.vectorstore.service import IndexingService
 
@@ -272,11 +438,33 @@ class IngestionWorker:
                 Video.status == "CHUNKED",
             )
         ).all()
+        failed_count = 0
         for v in videos:
-            res = service.index_video(session, v)
-            if res.status == "FAILED":
-                raise RuntimeError(f"Indexing failed for video '{v.youtube_id}': {res.error}")
-            session.commit()
+            if session.get(Video, v.id) is None:
+                continue
+            try:
+                res = service.index_video(session, v)
+                if res.status == "FAILED":
+                    failed_count += 1
+                    logger.error(
+                        "Indexing failed for video",
+                        extra={"video_id": v.youtube_id, "error": res.error},
+                    )
+                session.commit()
+            except Exception as e:
+                session.rollback()
+                failed_count += 1
+                logger.error(
+                    "Exception during indexing video",
+                    extra={"video_id": v.youtube_id, "error": str(e)},
+                )
+                stage = service._get_or_create_stage(session, v.id)
+                stage.status = "FAILED"
+                stage.error_detail = str(e)[:500]
+                session.commit()
+
+        if failed_count > 0:
+            raise RuntimeError(f"{failed_count} video(s) failed indexing")
 
     def _handle_job_failure(self, session: Session, job: Job, exc: Exception) -> None:
         """Handle a failed job: retry if attempts < max_retries, else fail."""

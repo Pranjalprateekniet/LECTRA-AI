@@ -20,4 +20,3 @@ __all__ = [
     "format_query_text",
     "resolve_embedding_device",
 ]
-

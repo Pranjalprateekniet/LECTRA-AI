@@ -16,10 +16,12 @@ from lectra_core.db.models import (
 from lectra_core.discovery.url_validation import InvalidPlaylistUrlError, validate_playlist_url
 from lectra_core.logging import get_logger
 from lectra_core.worker import (
+    CHUNK_PLAYLIST_JOB_TYPE,
     CHUNK_VIDEO_JOB_TYPE,
     DISCOVER_JOB_TYPE,
     EXTRACT_TRANSCRIPTS_JOB_TYPE,
     EXTRACT_VIDEO_TRANSCRIPT_JOB_TYPE,
+    INDEX_PLAYLIST_JOB_TYPE,
     INDEX_VIDEO_JOB_TYPE,
 )
 from pydantic import BaseModel
@@ -138,6 +140,13 @@ class RetryResponse(BaseModel):
     success: bool
     job_id: str
     message: str
+
+
+class VideoDeleteResponse(BaseModel):
+    success: bool
+    message: str
+    video_id: str
+    playlist_id: str
 
 
 # --- Helpers ---
@@ -298,10 +307,7 @@ def list_playlists(db: Session = Depends(get_db_session)) -> List[PlaylistRespon
     for p in playlists:
         counts = _get_playlist_counts(db, p.id)
         first_video = db.scalars(
-            select(Video)
-            .where(Video.playlist_id == p.id)
-            .order_by(Video.position.asc())
-            .limit(1)
+            select(Video).where(Video.playlist_id == p.id).order_by(Video.position.asc()).limit(1)
         ).first()
         thumb = (
             f"https://i.ytimg.com/vi/{first_video.youtube_id}/hqdefault.jpg"
@@ -347,9 +353,7 @@ def get_playlist(playlist_id: str, db: Session = Depends(get_db_session)) -> Pla
         .limit(1)
     ).first()
     thumb = (
-        f"https://i.ytimg.com/vi/{first_video.youtube_id}/hqdefault.jpg"
-        if first_video
-        else None
+        f"https://i.ytimg.com/vi/{first_video.youtube_id}/hqdefault.jpg" if first_video else None
     )
 
     return PlaylistResponse(
@@ -484,8 +488,7 @@ def get_playlist_videos(
         .group_by(TranscriptSegment.video_id)
     ).all()
     seg_info: Dict[str, Dict[str, Any]] = {
-        vid: {"count": cnt, "language": lang, "source": src}
-        for vid, cnt, lang, src in segment_rows
+        vid: {"count": cnt, "language": lang, "source": src} for vid, cnt, lang, src in segment_rows
     }
 
     result: List[VideoResponse] = []
@@ -560,8 +563,7 @@ def get_playlist_activity(
     for j in jobs:
         payload = j.payload or {}
         is_match = (
-            payload.get("playlist_url") == playlist.url
-            or payload.get("playlist_id") == playlist.id
+            payload.get("playlist_url") == playlist.url or payload.get("playlist_id") == playlist.id
         )
         if is_match:
             sev = (
@@ -662,9 +664,23 @@ def retry_playlist_ingestion(
             message="Discovery job re-enqueued successfully.",
         )
 
-    # Otherwise, enqueue transcript extraction for any pending/failed videos
+    # Determine what stage needs to be queued based on videos' status
+    counts = _get_playlist_counts(db, playlist.id)
+    if counts["discovered"] > 0 or counts["failed"] > 0:
+        job_type = EXTRACT_TRANSCRIPTS_JOB_TYPE
+        msg = "Transcript extraction job enqueued successfully."
+    elif counts["transcripts_ready"] > 0:
+        job_type = CHUNK_PLAYLIST_JOB_TYPE
+        msg = "Chunking job enqueued successfully."
+    elif counts["processing"] > 0 and counts["total_chunks"] > 0:
+        job_type = INDEX_PLAYLIST_JOB_TYPE
+        msg = "Indexing job enqueued successfully."
+    else:
+        job_type = EXTRACT_TRANSCRIPTS_JOB_TYPE
+        msg = "Transcript extraction job enqueued successfully."
+
     job = Job(
-        job_type=EXTRACT_TRANSCRIPTS_JOB_TYPE,
+        job_type=job_type,
         status="QUEUED",
         payload={
             "playlist_id": playlist.id,
@@ -676,7 +692,7 @@ def retry_playlist_ingestion(
     return RetryResponse(
         success=True,
         job_id=job.id,
-        message="Transcript extraction job enqueued successfully.",
+        message=msg,
     )
 
 
@@ -730,4 +746,109 @@ def retry_video_ingestion(
         success=True,
         job_id=job.id,
         message=f"Re-enqueued '{job_type}' for video '{video.title}'.",
+    )
+
+
+@router.delete("/{playlist_id}/videos/{video_id}", response_model=VideoDeleteResponse)
+def delete_playlist_video(
+    playlist_id: str,
+    video_id: str,
+    db: Session = Depends(get_db_session),
+) -> VideoDeleteResponse:
+    """Delete a video and its derived transcripts, chunks, embeddings, and artifacts."""
+    playlist = _find_playlist(db, playlist_id)
+    if playlist is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Playlist '{playlist_id}' not found.",
+        )
+
+    video = db.scalars(
+        select(Video).where(
+            Video.id == video_id,
+            Video.playlist_id == playlist.id,
+        )
+    ).first()
+
+    if video is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Video '{video_id}' not found in playlist '{playlist_id}'.",
+        )
+
+    video_title = video.title
+    youtube_id = video.youtube_id
+    from lectra_core.config import get_settings
+
+    settings = get_settings()
+
+    # 1. Invalidate / cancel active and queued jobs for this video
+    active_jobs = db.scalars(
+        select(Job).where(
+            Job.status.in_(["QUEUED", "RUNNING"]),
+        )
+    ).all()
+    for j in active_jobs:
+        payload = j.payload or {}
+        if payload.get("video_id") == video.id:
+            j.status = "CANCELLED"
+            j.error_summary = "Video was deleted from playlist."
+
+    # 2. Delete embeddings from Qdrant
+    try:
+        from lectra_core.vectorstore.qdrant import QdrantVectorStore
+
+        vs = QdrantVectorStore(settings=settings)
+        vs.delete_points_by_video_id(video.id)
+        logger.info("Deleted Qdrant points for video", extra={"video_id": video.id})
+    except Exception as exc:
+        logger.warning(
+            "Failed to delete Qdrant points during video removal",
+            extra={"video_id": video.id, "error": str(exc)},
+        )
+
+    # 3. Delete local intermediate artifact files
+    try:
+        transcripts_dir = settings.artifacts_dir / "transcripts"
+        if transcripts_dir.exists():
+            for p in transcripts_dir.glob(f"{youtube_id}_*"):
+                try:
+                    p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+        temp_audio_dir = settings.temp_audio_dir
+        if temp_audio_dir.exists():
+            for p in temp_audio_dir.glob(f"*{youtube_id}*"):
+                try:
+                    p.unlink(missing_ok=True)
+                except Exception:
+                    pass
+    except Exception as exc:
+        logger.warning(
+            "Error removing local artifact files during video deletion",
+            extra={"video_id": video.id, "error": str(exc)},
+        )
+
+    # 4. Delete Video record from SQLite (cascades to stages, transcripts, chunks)
+    db.delete(video)
+
+    # 5. Reconcile playlist video count
+    db.flush()
+    new_video_count = (
+        db.scalar(select(func.count(Video.id)).where(Video.playlist_id == playlist.id)) or 0
+    )
+    playlist.video_count = int(new_video_count)
+    db.commit()
+
+    logger.info(
+        "Successfully deleted video from playlist",
+        extra={"playlist_id": playlist.id, "video_id": video_id, "title": video_title},
+    )
+
+    return VideoDeleteResponse(
+        success=True,
+        message=f"Video '{video_title}' deleted successfully.",
+        video_id=video_id,
+        playlist_id=playlist.id,
     )

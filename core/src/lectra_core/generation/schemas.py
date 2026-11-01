@@ -19,9 +19,7 @@ class CitationItem(BaseModel):
     start_seconds: float = Field(..., ge=0.0, description="Start time in seconds")
     end_seconds: float = Field(..., ge=0.0, description="End time in seconds")
     youtube_url: str = Field(..., description="Constructed timestamped video link")
-    text: Optional[str] = Field(
-        default=None, description="Original transcript chunk text excerpt"
-    )
+    text: Optional[str] = Field(default=None, description="Original transcript chunk text excerpt")
     chunk_id: Optional[str] = Field(default=None, description="Unique chunk UUID")
     playlist_id: Optional[str] = Field(default=None, description="Playlist UUID")
 

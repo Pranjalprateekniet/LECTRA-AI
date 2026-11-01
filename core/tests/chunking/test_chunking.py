@@ -45,6 +45,7 @@ def chunking_db(tmp_path):
 # Phase B: Rolling Caption Deduplication Tests
 # ==============================================================================
 
+
 def test_rolling_caption_deduplication_removes_repeated_cues():
     """Verify that adjacent cues with overlapping timestamps strip duplicates."""
     cues = [
@@ -94,8 +95,9 @@ def test_preserves_legitimate_speech_repetition():
 # Phase A & D: 75-Second Chunking Tests
 # ==============================================================================
 
+
 def test_75_second_chunk_boundaries_and_sentence_awareness(chunking_db):
-    """Verify chunking targets ~75s and prefers sentence-ending boundaries."""
+    """Verify fixed 75s sliding window (70s stride, 5s overlap)."""
     session, settings = chunking_db
 
     video = Video(
@@ -121,39 +123,40 @@ def test_75_second_chunk_boundaries_and_sentence_awareness(chunking_db):
                 duration_seconds=5.0,
                 text=text,
                 language="en",
-                source="whisper",
+                source="generated",
             )
         )
     transcript_repository.save_segments(session, video.id, segs)
     session.commit()
 
-    service = ChunkingService(
-        settings=settings,
-        target_duration=75.0,
-        min_duration=60.0,
-        max_duration=90.0,
-    )
+    service = ChunkingService(settings=settings)
     chunks = service.chunk_video(session, video)
 
-    assert len(chunks) == 2
-    # Chunk 0 should break at segment 13 (ends at 70s) due to sentence boundary
+    # 150s total: Window 1 (0-75s), Window 2 (70-145s), Window 3 (140-150s)
+    assert len(chunks) == 3
     c0 = chunks[0]
     assert c0.chunk_index == 0
     assert c0.start_seconds == 0.0
-    assert c0.end_seconds == 70.0
-    assert c0.duration_seconds == 70.0
+    assert c0.end_seconds == 75.0
+    assert c0.duration_seconds == 75.0
     assert c0.source_segment_start_index == 0
-    assert c0.source_segment_end_index == 13
-    assert c0.text.endswith("Segment sentence 13.")
+    assert c0.source_segment_end_index == 14
 
-    # Chunk 1 covers the rest (70.0s to 150.0s = 80s)
     c1 = chunks[1]
     assert c1.chunk_index == 1
     assert c1.start_seconds == 70.0
-    assert c1.end_seconds == 150.0
-    assert c1.duration_seconds == 80.0
+    assert c1.end_seconds == 145.0
+    assert c1.duration_seconds == 75.0
     assert c1.source_segment_start_index == 14
-    assert c1.source_segment_end_index == 29
+    assert c1.source_segment_end_index == 28
+
+    c2 = chunks[2]
+    assert c2.chunk_index == 2
+    assert c2.start_seconds == 140.0
+    assert c2.end_seconds == 150.0
+    assert c2.duration_seconds == 10.0
+    assert c2.source_segment_start_index == 28
+    assert c2.source_segment_end_index == 29
 
 
 def test_short_final_chunk(chunking_db):
@@ -171,8 +174,8 @@ def test_short_final_chunk(chunking_db):
     session.flush()
 
     # 22 segments of 5s each = 110s total
-    # Chunk 0: 0.0s to 75.0s (15 segs)
-    # Chunk 1 (short final): 75.0s to 110.0s (7 segs, 35s duration)
+    # Chunk 0: 0.0s to 75.0s (stride 70s)
+    # Chunk 1 (short final): 70.0s to 110.0s (40s duration)
     segs = [
         TranscriptSegmentData(
             segment_index=i,
@@ -181,19 +184,21 @@ def test_short_final_chunk(chunking_db):
             duration_seconds=5.0,
             text=f"word {i}",
             language="en",
-            source="whisper",
+            source="generated",
         )
         for i in range(22)
     ]
     transcript_repository.save_segments(session, video.id, segs)
     session.commit()
 
-    service = ChunkingService(settings=settings, target_duration=75.0, min_duration=60.0)
+    service = ChunkingService(settings=settings)
     chunks = service.chunk_video(session, video)
 
     assert len(chunks) == 2
-    assert chunks[0].duration_seconds == 90.0
-    assert chunks[1].duration_seconds == 20.0  # Valid short final chunk (< min_duration)
+    assert chunks[0].duration_seconds == 75.0
+    assert chunks[1].start_seconds == 70.0
+    assert chunks[1].end_seconds == 110.0
+    assert chunks[1].duration_seconds == 40.0  # Valid short final chunk up to video end
     assert chunks[1].chunk_index == 1
 
 
@@ -284,9 +289,7 @@ def test_idempotent_regeneration(chunking_db):
     assert len(chunks_run2) == 1
 
     # Total in DB must remain exactly 1
-    total_in_db = session.scalars(
-        select(VideoChunk).where(VideoChunk.video_id == video.id)
-    ).all()
+    total_in_db = session.scalars(select(VideoChunk).where(VideoChunk.video_id == video.id)).all()
     assert len(total_in_db) == 1
     assert total_in_db[0].id == chunks_run1[0].id
 
@@ -295,14 +298,15 @@ def test_idempotent_regeneration(chunking_db):
 # Phase C: Extraction Priority & Multilingual Whisper Fallback Tests
 # ==============================================================================
 
+
 def test_subtitle_selection_priority():
     """Verify subtitle track priority: manual en > auto en > non-en > None."""
-    # 1. Manual English preferred over auto English
+    # 1. English auto preferred over manual English
     subtitles = {"en": [{"ext": "json3", "url": "https://example.com/en_manual"}]}
     auto = {"en": [{"ext": "json3", "url": "https://example.com/en_auto"}]}
-    chosen = select_best_track(subtitles, auto, preferred_languages=["en"], prefer_manual=True)
+    chosen = select_best_track(subtitles, auto, preferred_languages=["en"])
     assert chosen is not None
-    assert chosen[2] == "manual"
+    assert chosen[2] == "generated"
 
     # 2. Auto English selected if manual English is unavailable
     subtitles_hi = {"hi": [{"ext": "json3", "url": "https://example.com/hi_manual"}]}

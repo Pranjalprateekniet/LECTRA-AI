@@ -37,12 +37,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("video_id", "chunk_index", name="uq_video_chunks_video_index"),
     )
-    op.create_index(
-        op.f("ix_video_chunks_video_id"), "video_chunks", ["video_id"], unique=False
-    )
+    op.create_index(op.f("ix_video_chunks_video_id"), "video_chunks", ["video_id"], unique=False)
 
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_video_chunks_video_id"), table_name="video_chunks")
     op.drop_table("video_chunks")
-

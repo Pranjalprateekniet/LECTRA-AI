@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     # Translation (Argos Translate)
     translation_source_lang: str = "hi"
     translation_target_lang: str = "en"
+    argos_packages_dir: Path = Path("./data/models/argos-packages")
+    argos_package_index_url: str = (
+        "https://raw.githubusercontent.com/argosopentech/argospm-index/main/index.json"
+    )
 
     # LLM Provider — Phase 7
     llm_provider: Literal["groq", "gpt-oss"] = "groq"
@@ -173,6 +177,7 @@ class Settings(BaseSettings):
             self.artifacts_dir,
             self.temp_audio_dir,
             self.model_cache_dir,
+            self.argos_packages_dir,
         ]:
             path.mkdir(parents=True, exist_ok=True)
 

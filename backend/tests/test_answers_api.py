@@ -72,7 +72,9 @@ def test_generate_answer_endpoint_success(api_client):
     assert len(data["citations"]) == 1
     assert data["citations"][0]["source_id"] == "S1"
     assert data["citations"][0]["youtube_id"] == "II6ziNnub1Q"
-    assert data["citations"][0]["youtube_url"] == "https://www.youtube.com/watch?v=II6ziNnub1Q&t=439"
+    assert (
+        data["citations"][0]["youtube_url"] == "https://www.youtube.com/watch?v=II6ziNnub1Q&t=439"
+    )
 
 
 def test_generate_answer_insufficient_context(api_client):

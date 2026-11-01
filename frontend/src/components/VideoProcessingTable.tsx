@@ -11,12 +11,14 @@ import {
   ExternalLinkIcon,
   RefreshCwIcon,
   SearchIcon,
+  TrashIcon,
 } from "./Icons";
 
 interface VideoProcessingTableProps {
   videos: VideoResponse[];
   loading: boolean;
   onRetryVideo: (videoId: string) => Promise<void>;
+  onDeleteVideo?: (videoId: string) => Promise<void>;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -35,11 +37,15 @@ export function VideoProcessingTable({
   videos,
   loading,
   onRetryVideo,
+  onDeleteVideo,
 }: VideoProcessingTableProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [confirmDeleteVideo, setConfirmDeleteVideo] = useState<VideoResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const toggleExpand = (id: string) => {
     setExpandedVideoId(expandedVideoId === id ? null : id);
@@ -52,6 +58,20 @@ export function VideoProcessingTable({
       await onRetryVideo(videoId);
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDeleteVideo || !onDeleteVideo) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDeleteVideo(confirmDeleteVideo.id);
+      setConfirmDeleteVideo(null);
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete video");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -329,18 +349,34 @@ export function VideoProcessingTable({
                   </div>
 
                   {/* Right: Actions */}
-                  <div className="flex items-center gap-2 lg:w-1/12 justify-end">
+                  <div className="flex items-center gap-1.5 lg:w-1/12 justify-end">
                     {isFailed && (
                       <button
                         onClick={(e) => handleRetry(e, video.id)}
                         disabled={retryingId === video.id}
-                        className="px-2.5 py-1 rounded bg-rose-950/50 hover:bg-rose-900/50 border border-rose-800/60 text-rose-300 text-xs font-mono flex items-center gap-1 transition"
+                        className="px-2 py-1 rounded bg-rose-950/50 hover:bg-rose-900/50 border border-rose-800/60 text-rose-300 text-xs font-mono flex items-center gap-1 transition"
                         title="Retry processing this video"
                       >
                         <RefreshCwIcon
                           className={`w-3 h-3 ${retryingId === video.id ? "animate-spin" : ""}`}
                         />
                         <span>Retry</span>
+                      </button>
+                    )}
+
+                    {onDeleteVideo && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteError(null);
+                          setConfirmDeleteVideo(video);
+                        }}
+                        className="p-1.5 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/50 transition"
+                        title="Delete video from playlist"
+                        aria-label={`Delete video ${video.title}`}
+                      >
+                        <TrashIcon className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -415,6 +451,90 @@ export function VideoProcessingTable({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Confirmation Dialog Modal */}
+      {confirmDeleteVideo && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => {
+            if (!isDeleting) setConfirmDeleteVideo(null);
+          }}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                <TrashIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 id="delete-dialog-title" className="text-sm font-semibold text-slate-100">
+                  Delete Video from Playlist
+                </h3>
+                <p className="text-xs text-slate-400">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 space-y-1">
+              <div className="text-xs font-medium text-slate-200 line-clamp-2">
+                &ldquo;{confirmDeleteVideo.title}&rdquo;
+              </div>
+              <div className="text-[11px] font-mono text-slate-500 flex items-center gap-2">
+                <span>ID: {confirmDeleteVideo.youtube_id}</span>
+                <span>•</span>
+                <span>Position #{confirmDeleteVideo.position}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Are you sure you want to delete this video? This will permanently remove its transcript segments,
+              chunk boundaries, local artifact files, and vector embeddings from Qdrant.
+            </p>
+
+            {deleteError && (
+              <div className="p-3 bg-rose-950/40 border border-rose-800/60 rounded-lg text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteVideo(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-rose-900/30 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCwIcon className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="w-3.5 h-3.5" />
+                    <span>Confirm Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

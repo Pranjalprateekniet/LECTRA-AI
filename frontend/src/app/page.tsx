@@ -208,6 +208,51 @@ export default function Home() {
     }
   };
 
+  // Delete Video Handler with Optimistic UI updates
+  const handleDeleteVideo = async (videoId: string) => {
+    if (!selectedPlaylistId) return;
+
+    const previousVideos = [...videos];
+    const previousStatus = status ? { ...status } : null;
+    const targetVideo = videos.find((v) => v.id === videoId);
+
+    // Optimistic UI update: immediately remove video and adjust statistics
+    setVideos((prev) => prev.filter((v) => v.id !== videoId));
+    if (status && targetVideo) {
+      const isCompleted = targetVideo.status === "INDEXED";
+      const isFailed =
+        targetVideo.status === "FAILED" || targetVideo.status === "SKIPPED_UNAVAILABLE";
+      const isProcessing =
+        targetVideo.status === "IN_PROGRESS" ||
+        targetVideo.status === "DISCOVERED" ||
+        targetVideo.status === "TRANSCRIPT_READY" ||
+        targetVideo.status === "CHUNKED";
+
+      setStatus({
+        ...status,
+        video_count: Math.max(0, status.video_count - 1),
+        completed_count: isCompleted
+          ? Math.max(0, status.completed_count - 1)
+          : status.completed_count,
+        failed_count: isFailed ? Math.max(0, status.failed_count - 1) : status.failed_count,
+        processing_count: isProcessing
+          ? Math.max(0, status.processing_count - 1)
+          : status.processing_count,
+      });
+    }
+
+    try {
+      await api.deleteVideo(selectedPlaylistId, videoId);
+      // Reconcile with server state
+      await Promise.all([loadPlaylistDetails(selectedPlaylistId), loadPlaylists()]);
+    } catch (err: unknown) {
+      // Revert optimistic updates on failure
+      setVideos(previousVideos);
+      if (previousStatus) setStatus(previousStatus);
+      throw err;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
       {/* Header */}
@@ -286,6 +331,7 @@ export default function Home() {
                   videos={videos}
                   loading={detailsLoading}
                   onRetryVideo={handleRetryVideo}
+                  onDeleteVideo={handleDeleteVideo}
                 />
 
                 {/* Persisted Chronological Activity Log */}

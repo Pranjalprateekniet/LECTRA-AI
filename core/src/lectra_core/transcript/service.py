@@ -31,10 +31,11 @@ from lectra_core.transcript.models import (
     WhisperTranscriptionError,
 )
 from lectra_core.transcript.whisper_transcriber import (
-    FasterWhisperTranscriber,
+    FasterWhisperTranscriber,  # noqa: F401 - retained for testing / patch target compatibility
     WhisperTranscriberProtocol,
 )
 from lectra_core.transcript.ytdlp_extractor import SubtitleExtractor, YtDlpSubtitleExtractor
+from lectra_core.translation.service import TranslationService
 
 logger = get_logger("lectra.transcript.service")
 
@@ -78,10 +79,13 @@ class TranscriptService:
         settings: Optional[Settings] = None,
         extractor: Optional[SubtitleExtractor] = None,
         transcriber: Optional[WhisperTranscriberProtocol] = None,
+        translation_service: Optional[TranslationService] = None,
     ):
         self.settings = settings or get_settings()
         self.extractor: SubtitleExtractor = extractor or YtDlpSubtitleExtractor(self.settings)
-        self.transcriber: WhisperTranscriberProtocol = transcriber or FasterWhisperTranscriber(
+        # Decouple Whisper: Do not instantiate FasterWhisperTranscriber automatically
+        self.transcriber: Optional[WhisperTranscriberProtocol] = transcriber
+        self.translation_service: TranslationService = translation_service or TranslationService(
             self.settings
         )
 
@@ -134,6 +138,18 @@ class TranscriptService:
 
     def process_video(self, session: Session, video: Video) -> VideoTranscriptSummary:
         """Process transcript acquisition for a single video idempotently."""
+        # Check race condition: Video was deleted before processing started
+        if session.get(Video, video.id) is None:
+            logger.info(
+                "Video was deleted; skipping transcript processing",
+                extra={"video_id": video.youtube_id},
+            )
+            return VideoTranscriptSummary(
+                video_id=video.id,
+                youtube_id=video.youtube_id,
+                status="DELETED",
+            )
+
         # Check idempotency: If already transcript-ready, do not reprocess
         if video.status == "TRANSCRIPT_READY" and transcript_repository.has_transcripts(
             session, video.id
@@ -159,26 +175,30 @@ class TranscriptService:
                 error_detail=video.discovery_error,
             )
 
-        stage = self._get_or_create_stage(session, video.id)
+        stage = self._get_or_create_stage(session, video.id, STAGE_TRANSCRIPT_ACQUISITION)
         stage.status = "IN_PROGRESS"
         stage.attempts += 1
         session.flush()
 
-        # If video is already marked NEEDS_TRANSCRIPTION, jump directly to Whisper
+        # If video is already marked NEEDS_TRANSCRIPTION and no manual transcriber passed, skip
         if video.status == "NEEDS_TRANSCRIPTION":
-            return self._run_whisper_fallback(session, video, stage)
+            if self.transcriber is not None:
+                return self._run_whisper_fallback(session, video, stage)
+            logger.info(
+                "Video needs transcription; automatic Whisper execution is disabled",
+                extra={"video_id": video.youtube_id},
+            )
+            return VideoTranscriptSummary(
+                video_id=video.id,
+                youtube_id=video.youtube_id,
+                status="NEEDS_TRANSCRIPTION",
+                error_category="CAPTIONS_UNAVAILABLE",
+                error_detail="Captions unavailable; automated Whisper transcription is disabled.",
+            )
 
         try:
             # 1. Extract raw track via provider
             raw_track = self.extractor.extract_subtitles(video.url)
-
-            # If track is non-English, route to Whisper translation so English text is produced
-            if raw_track.language != "en":
-                logger.info(
-                    "Non-English subtitles detected; falling back to Whisper translation",
-                    extra={"video_id": video.youtube_id, "subtitle_language": raw_track.language},
-                )
-                return self._run_whisper_fallback(session, video, stage)
 
             # 2. Parse into normalized segment models
             segments = parse_subtitle_content(
@@ -192,37 +212,110 @@ class TranscriptService:
                 # Subtitle track was provided but had no non-empty segments
                 raise CaptionsUnavailableError("Subtitle track contained no valid text segments.")
 
-            extraction_result = TranscriptExtractionResult(
-                youtube_id=video.youtube_id,
-                language=raw_track.language,
-                source=raw_track.source,
-                segments=segments,
+            # 3. Handle English vs Supported non-English Translation
+            track_lang = raw_track.language or "en"
+            is_en = (
+                track_lang.lower() == "en"
+                or track_lang.lower().startswith("en-")
+                or track_lang.lower().startswith("en.")
             )
 
-            # 3. Persist local artifact atomically before database commit
-            artifact_path = self._write_artifact(video, extraction_result)
+            if not is_en:
+                if not self.translation_service.is_language_supported(track_lang):
+                    stage.status = "FAILED"
+                    stage.error_category = "UNSUPPORTED_LANGUAGE"
+                    stage.error_detail = (
+                        f"Language '{track_lang}' is not supported for English translation."
+                    )
+                    stage.completed_at = datetime.now(timezone.utc)
 
-            # 4. Persist segments in SQLite via repository
-            transcript_repository.save_segments(session, video.id, segments)
+                    trans_stage = self._get_or_create_stage(session, video.id, "TRANSLATION")
+                    trans_stage.status = "FAILED"
+                    trans_stage.error_category = "UNSUPPORTED_LANGUAGE"
+                    trans_stage.error_detail = stage.error_detail
+                    trans_stage.completed_at = stage.completed_at
 
-            # 5. Mark stage COMPLETED and video TRANSCRIPT_READY
+                    video.status = "EXTRACTION_FAILED"
+                    video.discovery_error = f"Unsupported language: {track_lang}"
+                    session.flush()
+
+                    logger.warning(
+                        "Unsupported caption language; refusing to index untranslated content",
+                        extra={"video_id": video.youtube_id, "language": track_lang},
+                    )
+                    return VideoTranscriptSummary(
+                        video_id=video.id,
+                        youtube_id=video.youtube_id,
+                        status="EXTRACTION_FAILED",
+                        language=track_lang,
+                        source=raw_track.source,
+                        error_category="UNSUPPORTED_LANGUAGE",
+                        error_detail=stage.error_detail,
+                    )
+
+                logger.info(
+                    "Translating non-English captions to English",
+                    extra={"video_id": video.youtube_id, "source_language": track_lang},
+                )
+                final_segments = self.translation_service.translate_segments(
+                    segments, source_lang=track_lang
+                )
+            else:
+                final_segments = segments
+
+            extraction_result = TranscriptExtractionResult(
+                youtube_id=video.youtube_id,
+                language="en",
+                source=raw_track.source,
+                segments=final_segments,
+            )
+
+            # Check race condition: video might have been deleted while extracting/translating
+            if session.get(Video, video.id) is None:
+                logger.info(
+                    "Video deleted during extraction; aborting persistence",
+                    extra={"video_id": video.youtube_id},
+                )
+                return VideoTranscriptSummary(
+                    video_id=video.id,
+                    youtube_id=video.youtube_id,
+                    status="DELETED",
+                )
+
+            # 4. Persist local artifact atomically before database commit
+            artifact_path = self._write_artifact(
+                video, extraction_result, original_language=track_lang
+            )
+
+            # 5. Persist segments in SQLite via repository
+            transcript_repository.save_segments(session, video.id, final_segments)
+
+            # 6. Mark transcript acquisition stage COMPLETED
             stage.status = "COMPLETED"
             stage.artifact_path = str(artifact_path)
             stage.error_category = None
             stage.error_detail = None
             stage.completed_at = datetime.now(timezone.utc)
 
+            # Record translation stage as COMPLETED
+            trans_stage = self._get_or_create_stage(session, video.id, "TRANSLATION")
+            trans_stage.status = "COMPLETED"
+            trans_stage.error_category = None
+            trans_stage.error_detail = None
+            trans_stage.completed_at = datetime.now(timezone.utc)
+
             video.status = "TRANSCRIPT_READY"
             video.discovery_error = None
             session.flush()
 
             logger.info(
-                "Transcript extracted and persisted successfully",
+                "Transcript extracted, translated (if applicable), and persisted successfully",
                 extra={
                     "video_id": video.youtube_id,
-                    "language": raw_track.language,
+                    "original_language": track_lang,
+                    "final_language": "en",
                     "source": raw_track.source,
-                    "segment_count": len(segments),
+                    "segment_count": len(final_segments),
                     "artifact_path": str(artifact_path),
                 },
             )
@@ -231,17 +324,40 @@ class TranscriptService:
                 video_id=video.id,
                 youtube_id=video.youtube_id,
                 status="TRANSCRIPT_READY",
-                language=raw_track.language,
+                language="en",
                 source=raw_track.source,
-                segment_count=len(segments),
+                segment_count=len(final_segments),
                 artifact_path=str(artifact_path),
             )
 
         except CaptionsUnavailableError as exc:
-            # Video is accessible but has no usable English captions; invoke local Whisper fallback
+            if self.transcriber is not None:
+                logger.info(
+                    "Captions unavailable; invoking explicitly configured Whisper fallback",
+                    extra={"video_id": video.youtube_id, "reason": str(exc)},
+                )
+                return self._run_whisper_fallback(session, video, stage)
+
+            # Normal captions-first ingestion: Whisper is disabled
             logger.info(
-                "Captions unavailable; falling back to local Whisper transcription",
+                "Captions unavailable; marking NEEDS_TRANSCRIPTION without Whisper",
                 extra={"video_id": video.youtube_id, "reason": str(exc)},
+            )
+            stage.status = "SKIPPED"
+            stage.error_category = "CAPTIONS_UNAVAILABLE"
+            stage.error_detail = str(exc)[:500]
+            stage.completed_at = datetime.now(timezone.utc)
+
+            video.status = "NEEDS_TRANSCRIPTION"
+            video.discovery_error = "CAPTIONS_UNAVAILABLE"
+            session.flush()
+
+            return VideoTranscriptSummary(
+                video_id=video.id,
+                youtube_id=video.youtube_id,
+                status="NEEDS_TRANSCRIPTION",
+                error_category="CAPTIONS_UNAVAILABLE",
+                error_detail=str(exc),
             )
             return self._run_whisper_fallback(session, video, stage)
 
@@ -426,18 +542,20 @@ class TranscriptService:
                 error_detail=err_msg,
             )
 
-    def _get_or_create_stage(self, session: Session, video_id: str) -> ProcessingStage:
+    def _get_or_create_stage(
+        self, session: Session, video_id: str, stage_name: str = STAGE_TRANSCRIPT_ACQUISITION
+    ) -> ProcessingStage:
         stage = session.scalars(
             select(ProcessingStage).where(
                 ProcessingStage.video_id == video_id,
-                ProcessingStage.stage_name == STAGE_TRANSCRIPT_ACQUISITION,
+                ProcessingStage.stage_name == stage_name,
             )
         ).first()
 
         if stage is None:
             stage = ProcessingStage(
                 video_id=video_id,
-                stage_name=STAGE_TRANSCRIPT_ACQUISITION,
+                stage_name=stage_name,
                 status="PENDING",
                 attempts=0,
             )
@@ -445,7 +563,12 @@ class TranscriptService:
             session.flush()
         return stage
 
-    def _write_artifact(self, video: Video, result: TranscriptExtractionResult) -> Path:
+    def _write_artifact(
+        self,
+        video: Video,
+        result: TranscriptExtractionResult,
+        original_language: Optional[str] = None,
+    ) -> Path:
         """Atomically persist transcript segments to local JSON artifact file."""
         transcripts_dir = self.settings.artifacts_dir / "transcripts"
         transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -457,6 +580,7 @@ class TranscriptService:
             "video_id": video.id,
             "youtube_id": video.youtube_id,
             "title": video.title,
+            "original_language": original_language or result.language,
             "language": result.language,
             "source": result.source,
             "segment_count": len(result.segments),

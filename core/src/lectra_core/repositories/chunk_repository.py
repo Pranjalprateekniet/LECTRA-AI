@@ -70,16 +70,11 @@ def get_by_video_id(session: Session, video_id: str) -> List[VideoChunk]:
 
 def has_chunks(session: Session, video_id: str) -> bool:
     """Check if any chunks exist for the given video."""
-    count = session.scalar(
-        select(func.count(VideoChunk.id)).where(VideoChunk.video_id == video_id)
-    )
+    count = session.scalar(select(func.count(VideoChunk.id)).where(VideoChunk.video_id == video_id))
     return bool(count and count > 0)
 
 
 def delete_by_video_id(session: Session, video_id: str) -> int:
     """Delete all chunks for a video. Returns count of deleted rows."""
-    result = session.execute(
-        delete(VideoChunk).where(VideoChunk.video_id == video_id)
-    )
+    result = session.execute(delete(VideoChunk).where(VideoChunk.video_id == video_id))
     return int(getattr(result, "rowcount", 0) or 0)
-

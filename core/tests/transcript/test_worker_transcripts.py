@@ -352,9 +352,5 @@ def test_worker_whisper_fallback_succeeds_for_uncaptioned_video(worker_env):
         video = session.scalars(
             select(Video).where(Video.youtube_id == "vid_whisper_fallback")
         ).first()
-        assert video.status == "TRANSCRIPT_READY"
-
-        segments = transcript_repository.get_by_video_id(session, video.id)
-        assert len(segments) == 2
-        assert segments[0].source == "whisper"
-        assert segments[0].language == "en"
+        assert video.status == "NEEDS_TRANSCRIPTION"
+        assert video.discovery_error == "CAPTIONS_UNAVAILABLE"

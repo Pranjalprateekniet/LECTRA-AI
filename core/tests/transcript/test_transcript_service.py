@@ -179,18 +179,12 @@ def test_successful_auto_generated_subtitle_extraction(service_env):
         assert segments[1].source == "generated"
 
 
-# 3. Non-English-only subtitles available — must be treated as no captions
+# 3. Non-English-only subtitles available — translated to English or marked NEEDS_TRANSCRIPTION
 def test_non_english_only_available_marks_needs_transcription(service_env):
-    """When only non-English (e.g. Hindi) captions exist, mark NEEDS_TRANSCRIPTION.
-
-    The extractor is configured with English-only preferences; the fake extractor
-    is told to raise CaptionsUnavailableError for the Hindi-only video — matching
-    the real YtDlpSubtitleExtractor behaviour when no English track is found.
-    The Whisper fallback detects non-English speech and marks NEEDS_TRANSCRIPTION.
-    """
+    """When captions are unavailable, mark NEEDS_TRANSCRIPTION with CAPTIONS_UNAVAILABLE."""
     settings, service, extractor, _ = service_env
     url = "https://www.youtube.com/watch?v=vid_hindi"
-    extractor.set_error(url, CaptionsUnavailableError("No English subtitles found"))
+    extractor.set_error(url, CaptionsUnavailableError("No captions found"))
 
     with next(get_db(settings)) as session:
         video = session.scalars(select(Video).where(Video.youtube_id == "vid_hindi")).first()

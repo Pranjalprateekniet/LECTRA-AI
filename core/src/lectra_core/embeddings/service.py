@@ -76,10 +76,7 @@ class EmbeddingService:
         if hasattr(inputs, "to"):
             inputs = inputs.to(device)
         else:
-            inputs = {
-                k: v.to(device) if hasattr(v, "to") else v
-                for k, v in inputs.items()
-            }
+            inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
 
         with torch.inference_mode():
             outputs = model(**inputs)

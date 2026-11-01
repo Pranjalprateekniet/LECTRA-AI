@@ -32,19 +32,24 @@ _SENTENCE_END_RE = re.compile(r"""[.?!]["']?\s*$""")
 
 
 class ChunkingService:
-    """Service for generating, validating, and persisting 75-second video chunks."""
+    """Service for generating, validating, and persisting 75-second video chunks with 5s overlap."""
 
     def __init__(
         self,
         settings: Optional[Settings] = None,
-        target_duration: float = 75.0,
-        min_duration: float = 60.0,
-        max_duration: float = 90.0,
+        duration: float = 75.0,
+        overlap: float = 5.0,
+        stride: float = 70.0,
+        target_duration: Optional[float] = None,
+        min_duration: Optional[float] = None,
+        max_duration: Optional[float] = None,
     ):
         self.settings = settings or get_settings()
-        self.target_duration = target_duration
-        self.min_duration = min_duration
-        self.max_duration = max_duration
+        self.duration = target_duration if target_duration is not None else duration
+        self.overlap = overlap
+        self.stride = (
+            (self.duration - self.overlap) if stride == 70.0 and self.duration != 75.0 else stride
+        )
 
     def _get_or_create_stage(self, session: Session, video_id: str) -> ProcessingStage:
         stage = session.scalars(
@@ -66,7 +71,12 @@ class ChunkingService:
         return stage
 
     def chunk_video(self, session: Session, video: Video) -> List[VideoChunk]:
-        """Generate and persist 75-second chunks for a single video idempotently."""
+        """Generate and persist 75-second chunks (70s stride, 5s overlap) idempotently."""
+        # Check race condition: video was deleted
+        if session.get(Video, video.id) is None:
+            logger.info("Video deleted; skipping chunking", extra={"video_id": video.youtube_id})
+            return []
+
         stage = self._get_or_create_stage(session, video.id)
         stage.status = "IN_PROGRESS"
         stage.attempts += 1
@@ -84,7 +94,6 @@ class ChunkingService:
             return []
 
         # 1. Deduplicate rolling cues for auto-generated captions
-        # For whisper or manual captions, deduplicator preserves text as is
         cleaned_pairs = deduplicate_rolling_captions(segments)
         if not cleaned_pairs:
             logger.warning(
@@ -96,69 +105,73 @@ class ChunkingService:
             session.flush()
             return []
 
-        # 2. Accumulate into 75-second chunks with sentence-boundary preference
+        # 2. Fixed sliding window: duration = 75s, overlap = 5s, stride = 70s
+        total_duration = max(float(seg.end_seconds) for seg, _ in cleaned_pairs)
         chunks_data: List[ChunkData] = []
         chunk_idx = 0
-        curr_start_idx = 0
-        total_items = len(cleaned_pairs)
+        curr_window_start = 0.0
 
-        while curr_start_idx < total_items:
-            start_seg, _ = cleaned_pairs[curr_start_idx]
-            start_time = float(start_seg.start_seconds)
-            total_remaining = float(cleaned_pairs[-1][0].end_seconds) - start_time
+        while curr_window_start < total_duration:
+            curr_window_end = min(curr_window_start + self.duration, total_duration)
 
-            # If all remaining speech fits within max_duration, emit as final chunk
-            if total_remaining <= self.max_duration:
-                end_idx = total_items - 1
-            else:
-                end_idx = curr_start_idx
-                for j in range(curr_start_idx, total_items):
-                    seg, txt = cleaned_pairs[j]
-                    curr_end = float(seg.end_seconds)
-                    dur = curr_end - start_time
-                    end_idx = j
-
-                    ends_with_sentence = bool(_SENTENCE_END_RE.search(txt))
-
-                    # Prefer sentence boundary when within min_duration and max_duration
-                    if dur >= self.min_duration and ends_with_sentence:
-                        break
-
-                    # If next segment exceeds max_duration, stop here
-                    if j + 1 < total_items:
-                        next_end = float(cleaned_pairs[j + 1][0].end_seconds)
-                        if (next_end - start_time) > self.max_duration:
-                            break
-                    elif dur >= self.target_duration:
-                        break
-
-            c_pairs = cleaned_pairs[curr_start_idx : end_idx + 1]
-            chunk_text = " ".join(txt for _, txt in c_pairs)
-            c_start = float(c_pairs[0][0].start_seconds)
-            c_end = float(c_pairs[-1][0].end_seconds)
-            c_dur = round(c_end - c_start, 3)
-
-            # Deterministic UUID5 based on video ID and chunk index
-            chunk_id = str(uuid.uuid5(CHUNK_UUID_NAMESPACE, f"{video.id}:{chunk_idx}"))
-            token_count = count_tokens(chunk_text)
-
-            chunks_data.append(
-                ChunkData(
-                    id=chunk_id,
-                    video_id=video.id,
-                    chunk_index=chunk_idx,
-                    start_seconds=round(c_start, 3),
-                    end_seconds=round(c_end, 3),
-                    duration_seconds=c_dur,
-                    text=chunk_text,
-                    token_count=token_count,
-                    source_segment_start_index=int(c_pairs[0][0].segment_index),
-                    source_segment_end_index=int(c_pairs[-1][0].segment_index),
+            # Find all segments overlapping with [curr_window_start, curr_window_end]
+            overlapping = [
+                (seg, txt)
+                for seg, txt in cleaned_pairs
+                if (
+                    float(seg.start_seconds) < curr_window_end
+                    and float(seg.end_seconds) > curr_window_start
                 )
-            )
+                or (
+                    float(seg.start_seconds) == float(seg.end_seconds)
+                    and curr_window_start <= float(seg.start_seconds) <= curr_window_end
+                )
+            ]
 
-            chunk_idx += 1
-            curr_start_idx = end_idx + 1
+            chunk_text = " ".join(txt.strip() for _, txt in overlapping if txt and txt.strip())
+
+            # Only emit chunk if it contains non-empty text
+            if chunk_text:
+                c_start = round(curr_window_start, 3)
+                c_end = round(curr_window_end, 3)
+                c_dur = round(c_end - c_start, 3)
+                chunk_id = str(uuid.uuid5(CHUNK_UUID_NAMESPACE, f"{video.id}:{chunk_idx}"))
+                token_count = count_tokens(chunk_text)
+
+                start_seg_idx = int(overlapping[0][0].segment_index)
+                end_seg_idx = int(overlapping[-1][0].segment_index)
+
+                chunks_data.append(
+                    ChunkData(
+                        id=chunk_id,
+                        video_id=video.id,
+                        chunk_index=chunk_idx,
+                        start_seconds=c_start,
+                        end_seconds=c_end,
+                        duration_seconds=c_dur,
+                        text=chunk_text,
+                        token_count=token_count,
+                        source_segment_start_index=start_seg_idx,
+                        source_segment_end_index=end_seg_idx,
+                    )
+                )
+                chunk_idx += 1
+
+            # Termination condition: this chunk reached video end or next stride exceeds video end
+            if (
+                curr_window_end >= total_duration
+                or (curr_window_start + self.stride) >= total_duration
+            ):
+                break
+
+            curr_window_start += self.stride
+
+        # Check race condition before saving
+        if session.get(Video, video.id) is None:
+            logger.info(
+                "Video deleted before saving chunks; aborting", extra={"video_id": video.youtube_id}
+            )
+            return []
 
         # 3. Persist chunks idempotently via repository
         saved_records = chunk_repository.save_chunks(session, video.id, chunks_data)

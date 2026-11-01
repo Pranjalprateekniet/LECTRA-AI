@@ -18,4 +18,3 @@ __all__ = [
     "SearchResultItem",
     "build_qdrant_filter",
 ]
-

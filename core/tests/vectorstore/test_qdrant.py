@@ -199,9 +199,9 @@ def test_indexing_service_orchestration_and_idempotency(mock_db):
     session.refresh(video)
     assert video.status == "INDEXED"
 
-    stage = session.query(ProcessingStage).filter_by(
-        video_id=video.id, stage_name="INDEXING"
-    ).first()
+    stage = (
+        session.query(ProcessingStage).filter_by(video_id=video.id, stage_name="INDEXING").first()
+    )
     assert stage is not None
     assert stage.status == "COMPLETED"
 
@@ -256,9 +256,9 @@ def test_indexing_service_failure_recovery_on_verification_mismatch(mock_db):
     # Video status should not be advanced to INDEXED
     assert video.status == "CHUNKED"
 
-    stage = session.query(ProcessingStage).filter_by(
-        video_id=video.id, stage_name="INDEXING"
-    ).first()
+    stage = (
+        session.query(ProcessingStage).filter_by(video_id=video.id, stage_name="INDEXING").first()
+    )
     assert stage is not None
     assert stage.status == "FAILED"
     assert stage.error_category == "INDEXING_FAILED"
@@ -322,9 +322,9 @@ def test_sqlite_checkpoint_persistence_on_successful_indexing(mock_db):
     assert persisted_video is not None
     assert persisted_video.status == "INDEXED"
 
-    persisted_stage = session.query(ProcessingStage).filter_by(
-        video_id=video.id, stage_name="INDEXING"
-    ).first()
+    persisted_stage = (
+        session.query(ProcessingStage).filter_by(video_id=video.id, stage_name="INDEXING").first()
+    )
     assert persisted_stage is not None
     assert persisted_stage.status == "COMPLETED"
     assert persisted_stage.completed_at is not None

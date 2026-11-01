@@ -53,76 +53,63 @@ def _is_translated_track(fmt_list: List[Dict[str, Any]]) -> bool:
 def select_best_track(
     subtitles: Dict[str, List[Dict[str, Any]]],
     automatic_captions: Dict[str, List[Dict[str, Any]]],
-    preferred_languages: List[str],
-    prefer_manual: bool = True,
-    allow_non_english: bool = False,
+    preferred_languages: Optional[List[str]] = None,
+    prefer_manual: bool = False,
+    allow_non_english: bool = True,
 ) -> Optional[Tuple[List[Dict[str, Any]], str, str]]:
-    """Select the best available subtitle track according to preferences.
+    """Select the best available subtitle track according to captions-first priority.
 
-    Only tracks whose language code matches one of *preferred_languages* (exact
-    or prefix match) are considered.  Auto-translated tracks (containing `tlang=`)
-    are skipped to respect the English-only and no-translation requirements.
+    Priority:
+    1. English auto-generated captions (preferred primary source).
+    2. English manual captions (if auto-generated is unavailable).
+    3. Hindi manual caption tracks.
+    4. Hindi auto-generated caption tracks.
+    5. Other manual caption tracks.
+    6. Other auto-generated caption tracks.
 
-    Returns: (format_list, selected_language, source_type) or None if no
-    matching captions exist.
+    Auto-translated tracks (containing `tlang=`) are skipped to respect pristine source
+    transcripts and rely on local translation.
+
+    Returns: (format_list, selected_language, source_type) or None if no usable captions exist.
     """
     manual_tracks = subtitles or {}
     auto_tracks = automatic_captions or {}
 
-    def _find_matching_track(
-        tracks: Dict[str, List[Dict[str, Any]]],
-    ) -> Optional[Tuple[List[Dict[str, Any]], str]]:
-        if not tracks:
-            return None
-        # 1. Exact match on preferred languages in order
-        for pref in preferred_languages:
-            pref_lower = pref.lower().strip()
-            for lang_code, fmt_list in tracks.items():
-                if lang_code.lower() == pref_lower and fmt_list:
-                    if _is_translated_track(fmt_list):
-                        continue
-                    return fmt_list, lang_code
+    def _is_en(code: str) -> bool:
+        c = code.lower().strip()
+        return c == "en" or c.startswith("en-") or c.startswith("en.")
 
-        # 2. Prefix match on preferred languages in order (e.g., 'en-US', 'en-GB')
-        for pref in preferred_languages:
-            pref_lower = pref.lower().strip()
-            for lang_code, fmt_list in tracks.items():
-                lower_code = lang_code.lower()
-                if (
-                    lower_code.startswith(f"{pref_lower}-")
-                    or lower_code.startswith(f"{pref_lower}.")
-                ) and fmt_list:
-                    if _is_translated_track(fmt_list):
-                        continue
-                    return fmt_list, lang_code
+    def _is_hi(code: str) -> bool:
+        c = code.lower().strip()
+        return c == "hi" or c.startswith("hi-") or c.startswith("hi.")
 
-        # No match for any preferred language — do NOT fall back to arbitrary language.
-        return None
+    # 1. Prefer English auto-generated captions as primary source
+    for lang_code, fmt_list in auto_tracks.items():
+        if _is_en(lang_code) and fmt_list and not _is_translated_track(fmt_list):
+            return fmt_list, lang_code, "generated"
 
-    if prefer_manual:
-        manual_match = _find_matching_track(manual_tracks)
-        if manual_match:
-            return manual_match[0], manual_match[1], "manual"
+    # 2. English manual captions
+    for lang_code, fmt_list in manual_tracks.items():
+        if _is_en(lang_code) and fmt_list and not _is_translated_track(fmt_list):
+            return fmt_list, lang_code, "manual"
 
-        auto_match = _find_matching_track(auto_tracks)
-        if auto_match:
-            return auto_match[0], auto_match[1], "generated"
-    else:
-        auto_match = _find_matching_track(auto_tracks)
-        if auto_match:
-            return auto_match[0], auto_match[1], "generated"
-
-        manual_match = _find_matching_track(manual_tracks)
-        if manual_match:
-            return manual_match[0], manual_match[1], "manual"
-
-    # 3. If English subtitles are unavailable and allow_non_english is enabled,
-    # check for available non-English subtitles as translation input.
     if allow_non_english:
+        # 3. Hindi manual tracks
+        for lang_code, fmt_list in manual_tracks.items():
+            if _is_hi(lang_code) and fmt_list and not _is_translated_track(fmt_list):
+                return fmt_list, lang_code, "manual"
+
+        # 4. Hindi auto-generated tracks
+        for lang_code, fmt_list in auto_tracks.items():
+            if _is_hi(lang_code) and fmt_list and not _is_translated_track(fmt_list):
+                return fmt_list, lang_code, "generated"
+
+        # 5. Other manual tracks (non-English, non-Hindi)
         for lang_code, fmt_list in manual_tracks.items():
             if fmt_list and not _is_translated_track(fmt_list):
                 return fmt_list, lang_code, "manual"
 
+        # 6. Other auto-generated tracks (non-English, non-Hindi)
         for lang_code, fmt_list in auto_tracks.items():
             if fmt_list and not _is_translated_track(fmt_list):
                 return fmt_list, lang_code, "generated"
