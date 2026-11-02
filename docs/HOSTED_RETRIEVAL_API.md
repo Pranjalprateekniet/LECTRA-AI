@@ -26,9 +26,8 @@ The local backend uses the user's own `GROQ_API_KEY` to construct grounded answe
 The application supports two explicit operational modes:
 
 ### `APP_MODE=USER` (Local End-User Machine)
-- **Mandatory Remote Retrieval**: `RETRIEVAL_API_URL` is strictly required. If missing, startup fails immediately with a descriptive configuration error (`ValueError`). The system **never silently falls back** to local retrieval.
-- **Zero Local Model Downloads**: PyTorch weights, `EmbeddingModelManager`, and `EmbeddingService` are **never instantiated or downloaded** on the user's machine. The local backend uses lightweight `httpx` to communicate with the hosted retrieval API.
-- **No Local Qdrant Connection**: Qdrant connection parameters (`QDRANT_URL`, `QDRANT_API_KEY`) are cleared (`qdrant_url = None`).
+- **Local-First Default**: By default, queries the local persistent Qdrant database embedded on disk at `data/qdrant/` with zero cloud dependencies.
+- **Optional Remote Retrieval Override**: When `RETRIEVAL_API_URL` is explicitly configured, queries are delegated to the hosted retrieval service via lightweight `httpx`, avoiding any local vector database or embedding model instantiation.
 - **Ingestion Disabled**: Playlist submission (`POST /api/v1/playlists`), retries, and deletions return `HTTP 403 Forbidden`. The user machine functions exclusively as a grounded revision assistant.
 - **Private Groq Key**: The user's `GROQ_API_KEY` is kept exclusively on their local machine and is never transmitted to the hosted retrieval service.
 
@@ -250,7 +249,7 @@ APP_MODE=USER
 # Groq API Key (Kept exclusively on local machine)
 GROQ_API_KEY=gsk_your_groq_api_key_here
 
-# Central retrieval API endpoint (MANDATORY in USER mode)
+# Central retrieval API endpoint (Optional override for remote hosted retrieval)
 RETRIEVAL_API_URL=https://your-retrieval-api.example.com/api/v1/retrieve
 ```
 

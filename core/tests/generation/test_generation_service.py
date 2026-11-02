@@ -201,3 +201,33 @@ def test_generation_invalid_json_raises_generation_error(mock_retrieval_service,
 
     with pytest.raises(GenerationError, match="did not contain valid JSON"):
         service.generate_answer(GenerationRequest(query="Test query"))
+
+
+def test_generation_service_defaults_to_local_retrieval_in_user_mode(mock_groq_client, tmp_path):
+    """Verify GenerationService defaults to local RetrievalService in USER mode."""
+    from lectra_core.retrieval.service import RetrievalService
+
+    user_settings = Settings(
+        app_mode="USER",
+        retrieval_api_url=None,
+        qdrant_path=tmp_path / "qdrant",
+        sqlite_path=tmp_path / "user.db",
+        database_url=f"sqlite:///{tmp_path}/user.db",
+    )
+    service = GenerationService(settings=user_settings, groq_client=mock_groq_client)
+    assert isinstance(service.retrieval_service, RetrievalService)
+    assert service.retrieval_service.vector_store.is_local is True
+
+
+def test_generation_service_selects_remote_retrieval_when_url_set(mock_groq_client, tmp_path):
+    """Verify GenerationService selects RemoteRetrievalService when retrieval_api_url is set."""
+    from lectra_core.retrieval.remote import RemoteRetrievalService
+
+    user_settings = Settings(
+        app_mode="USER",
+        retrieval_api_url="https://retrieval.example.com/api/v1/retrieve",
+        sqlite_path=tmp_path / "user.db",
+        database_url=f"sqlite:///{tmp_path}/user.db",
+    )
+    service = GenerationService(settings=user_settings, groq_client=mock_groq_client)
+    assert isinstance(service.retrieval_service, RemoteRetrievalService)

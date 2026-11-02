@@ -36,13 +36,6 @@ class GenerationService:
         self.settings = settings or get_settings()
         if retrieval_service is not None:
             self.retrieval_service = retrieval_service
-        elif self.settings.app_mode == "USER":
-            if not self.settings.retrieval_api_url:
-                raise ValueError(
-                    "Configuration error: In USER mode, RETRIEVAL_API_URL is mandatory. "
-                    "Cannot instantiate local retrieval in USER mode."
-                )
-            self.retrieval_service = RemoteRetrievalService(settings=self.settings)
         elif self.settings.retrieval_api_url:
             self.retrieval_service = RemoteRetrievalService(settings=self.settings)
         else:

@@ -98,3 +98,18 @@ def test_directory_creation(tmp_path):
     assert (data_dir / "artifacts").exists()
     assert (data_dir / "temp_audio").exists()
     assert (data_dir / "models").exists()
+
+
+def test_env_example_loads_cleanly_as_user_profile():
+    """Verify that .env.example parses without errors and defaults to USER profile."""
+    from lectra_core.config import PROJECT_ROOT
+
+    env_example = PROJECT_ROOT / ".env.example"
+    assert env_example.exists()
+
+    settings = Settings(_env_file=str(env_example))
+    assert settings.app_mode == "USER"
+    assert settings.retrieval_api_url is None
+    assert str(settings.qdrant_path).endswith("data/qdrant")
+    assert settings.qdrant_collection_name == "revision_chunks"
+    assert settings.groq_model_name == "openai/gpt-oss-120b"

@@ -16,7 +16,6 @@ Covers:
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 from lectra_backend.main import create_app as create_local_backend_app
 from lectra_core.config import Settings
@@ -71,6 +70,58 @@ def test_developer_mode_retains_cloud_behavior():
     assert s.qdrant_url == "https://cloud-cluster.qdrant.io"
     vs = QdrantVectorStore(settings=s)
     assert vs.is_local is False
+
+
+def test_developer_mode_local_qdrant_behavior():
+    """In DEVELOPER mode without QDRANT_URL, local persistent Qdrant is used."""
+    from lectra_core.vectorstore.qdrant import QdrantVectorStore
+
+    s = Settings(
+        app_mode="DEVELOPER",
+        qdrant_url=None,
+    )
+    assert s.app_mode == "DEVELOPER"
+    assert s.qdrant_url is None
+    vs = QdrantVectorStore(settings=s)
+    assert vs.is_local is True
+
+
+def test_fastapi_dependency_injection_consistency():
+    """Verify get_retrieval_service and get_generation_service are consistent."""
+    from lectra_backend.dependencies import get_generation_service, get_retrieval_service
+    from lectra_core.generation.service import GenerationService
+    from lectra_core.retrieval.remote import RemoteRetrievalService
+    from lectra_core.retrieval.service import RetrievalService
+
+    # 1. USER mode without RETRIEVAL_API_URL -> local RetrievalService
+    user_local_settings = Settings(app_mode="USER", retrieval_api_url=None)
+    retrieval_svc = get_retrieval_service(settings=user_local_settings)
+    assert isinstance(retrieval_svc, RetrievalService)
+    assert retrieval_svc.vector_store.is_local is True
+
+    gen_svc = get_generation_service(
+        settings=user_local_settings,
+        retrieval_service=retrieval_svc,
+    )
+    assert isinstance(gen_svc, GenerationService)
+    assert gen_svc.retrieval_service is retrieval_svc
+
+    # Direct GenerationService instantiation without explicit retrieval_service
+    direct_gen_svc = GenerationService(settings=user_local_settings)
+    assert isinstance(direct_gen_svc.retrieval_service, RetrievalService)
+    assert direct_gen_svc.retrieval_service.vector_store.is_local is True
+
+    # 2. USER mode with RETRIEVAL_API_URL -> RemoteRetrievalService
+    user_remote_settings = Settings(
+        app_mode="USER",
+        retrieval_api_url="https://api.revisionrag.com/api/v1/retrieve",
+    )
+    remote_retrieval_svc = get_retrieval_service(settings=user_remote_settings)
+    assert isinstance(remote_retrieval_svc, RemoteRetrievalService)
+
+    direct_remote_gen_svc = GenerationService(settings=user_remote_settings)
+    assert isinstance(direct_remote_gen_svc.retrieval_service, RemoteRetrievalService)
+
 
 
 # --------------------------------------------------------------------------
@@ -349,7 +400,7 @@ def test_local_retrieval_playlist_filtering():
 
 
 def test_query_endpoint_returns_timestamped_citations(tmp_path):
-    """Verify POST /api/v1/query (and /api/v1/answers/generate) returns grounded answers and citations."""
+    """Verify /api/v1/query and answers/generate return grounded answers with citations."""
     from lectra_core.generation.service import GenerationService
     from lectra_core.retrieval.service import RetrievalService
 
