@@ -11,6 +11,10 @@ import {
   saveChatHistory,
   saveSelectedCitation,
 } from "@/lib/chatStorage";
+import {
+  loadSelectedPlaylistId,
+  saveSelectedPlaylistId,
+} from "@/lib/playlistStorage";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { YouTubePlayerPanel } from "./YouTubePlayerPanel";
 import {
@@ -26,6 +30,7 @@ import {
 interface ChatInterfaceProps {
   playlists: Playlist[];
   defaultPlaylistId: string | null;
+  onSelectPlaylist?: (playlistId: string) => void;
 }
 
 const STARTER_QUESTIONS = [
@@ -55,20 +60,29 @@ export function generateMessageId(prefix: "user" | "assistant"): string {
   return `${prefix}-${Date.now()}-${messageSeq}`;
 }
 
-export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfaceProps) {
+export function ChatInterface({
+  playlists,
+  defaultPlaylistId,
+  onSelectPlaylist,
+}: ChatInterfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (typeof window === "undefined") return [];
     return loadChatHistory();
   });
   const [inputQuery, setInputQuery] = useState("");
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | "ALL">(
-    defaultPlaylistId || "ALL"
-  );
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | "ALL">(() => {
+    if (defaultPlaylistId) return defaultPlaylistId;
+    if (typeof window !== "undefined") {
+      const saved = loadSelectedPlaylistId();
+      if (saved) return saved;
+    }
+    return "ALL";
+  });
   const [prevDefaultId, setPrevDefaultId] = useState(defaultPlaylistId);
   if (defaultPlaylistId !== prevDefaultId) {
     setPrevDefaultId(defaultPlaylistId);
-    if (selectedPlaylistId === "ALL" && defaultPlaylistId) {
+    if (defaultPlaylistId) {
       setSelectedPlaylistId(defaultPlaylistId);
     }
   }
@@ -141,7 +155,7 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
   const handleSelectCitation = (citation: CitationItem) => {
     setSelectedCitation(citation);
     // On mobile, auto-switch to player tab so the user sees the video immediately
-    if (window.innerWidth < 1024) {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setMobileTab("player");
     }
   };
@@ -195,10 +209,7 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // Automatic video selection after every new answer:
-      // Read citations associated with this specific answer, find the first valid
-      // citation containing a YouTube video ID and timestamp, and select it.
-      // If no valid citation exists (e.g. insufficient_context), clear selection to show empty player state.
+      // Automatic video selection after every new answer
       const firstValid = findFirstValidCitation(decoratedCitations);
       setSelectedCitation(firstValid);
     } catch (err: unknown) {
@@ -233,26 +244,33 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
     }
   };
 
+  const handleScopeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextId = e.target.value;
+    setSelectedPlaylistId(nextId);
+    saveSelectedPlaylistId(nextId);
+    onSelectPlaylist?.(nextId);
+  };
+
   const activePlaylist = playlists.find((p) => p.id === selectedPlaylistId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-125px)] min-h-[640px] bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-110px)] min-h-[580px] bg-[#111111] border border-[#292929] rounded-xl overflow-hidden min-w-0 w-full shadow-xs">
       {/* Top Filter & Control Bar */}
-      <div className="px-4 sm:px-6 py-3 border-b border-slate-800 bg-slate-950/80 flex flex-wrap items-center justify-between gap-3">
+      <div className="px-3 sm:px-4 py-2 border-b border-[#292929] bg-[#111111] flex flex-wrap items-center justify-between gap-2.5 min-w-0">
         {/* Left: Playlist Scope Selector */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 min-w-0">
           <label
             htmlFor="playlist-scope-select"
-            className="text-xs font-semibold text-slate-400 uppercase tracking-wider"
+            className="text-[11px] font-medium text-[#929292] uppercase tracking-wider shrink-0"
           >
             Scope:
           </label>
-          <div className="relative">
+          <div className="relative min-w-0">
             <select
               id="playlist-scope-select"
               value={selectedPlaylistId}
-              onChange={(e) => setSelectedPlaylistId(e.target.value)}
-              className="text-xs bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+              onChange={handleScopeChange}
+              className="text-xs bg-[#181818] border border-[#292929] rounded-md px-2.5 py-1 text-[#F5F5F5] focus:outline-none focus:border-[#444] font-medium max-w-[200px] sm:max-w-[280px] truncate"
             >
               <option value="ALL">All Indexed Playlists</option>
               {playlists.map((pl) => (
@@ -264,91 +282,91 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
           </div>
 
           {activePlaylist && (
-            <span className="hidden xl:inline text-[11px] text-slate-500 font-mono">
-              Filtered to {activePlaylist.video_count} videos
+            <span className="hidden xl:inline text-[11px] text-[#626262] font-mono truncate">
+              {activePlaylist.video_count} videos
             </span>
           )}
         </div>
 
         {/* Center: Mobile View Toggle (hidden on desktop lg) */}
-        <div className="flex lg:hidden items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-xs">
+        <div className="flex lg:hidden items-center bg-[#181818] p-0.5 rounded-md border border-[#292929] text-xs">
           <button
             onClick={() => setMobileTab("chat")}
-            className={`px-3 py-1 rounded-md font-medium transition ${
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
               mobileTab === "chat"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-[#202020] text-[#F5F5F5] border border-[#292929]"
+                : "text-[#929292] hover:text-[#F5F5F5]"
             }`}
           >
             Chat
           </button>
           <button
             onClick={() => setMobileTab("player")}
-            className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
               mobileTab === "player"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                ? "bg-[#202020] text-[#F5F5F5] border border-[#292929]"
+                : "text-[#929292] hover:text-[#F5F5F5]"
             }`}
           >
-            <PlayIcon className="w-3 h-3 text-rose-500" />
+            <PlayIcon className="w-3 h-3 text-[#F5F5F5]" />
             <span>Lecture Video</span>
             {selectedCitation && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             )}
           </button>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {messages.length > 0 && (
             <button
               onClick={handleClearHistory}
-              className="text-xs text-slate-400 hover:text-rose-400 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-rose-900/50 hover:bg-rose-950/30 transition flex items-center gap-1.5 font-mono"
+              className="text-xs text-[#929292] hover:text-[#F5F5F5] px-2 py-1 rounded-md border border-[#292929] hover:bg-[#181818] transition-colors flex items-center gap-1.5 font-mono"
               title="Clear Chat"
               aria-label="Clear Chat"
             >
-              <TrashIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Clear Chat</span>
+              <TrashIcon className="w-3 h-3" />
+              <span className="hidden sm:inline">Clear</span>
             </button>
           )}
 
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-indigo-400 bg-indigo-950/40 px-2.5 py-1 rounded-md border border-indigo-800/40">
-            <SparklesIcon className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#929292] bg-[#181818] px-2 py-1 rounded-md border border-[#292929]">
+            <SparklesIcon className="w-3 h-3 text-[#929292]" />
             <span className="hidden sm:inline">Groq GPT-OSS-120B</span>
           </div>
         </div>
       </div>
 
       {/* Main Split-Screen Workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* LEFT PANEL: Chat Interface (54% on desktop) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-w-0 w-full">
+        {/* LEFT PANEL: Chat Interface (50% on desktop) */}
         <div
-          className={`w-full lg:w-[54%] flex flex-col h-full border-r border-slate-800/80 bg-slate-950/30 ${
+          className={`w-full lg:w-1/2 flex flex-col h-full border-b lg:border-b-0 lg:border-r border-[#292929] bg-[#0E0E0E] min-w-0 ${
             mobileTab === "chat" ? "flex" : "hidden lg:flex"
           }`}
         >
           {/* Scrollable Conversation History */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4 space-y-3 min-w-0">
             {/* Empty State */}
             {messages.length === 0 && (
-              <div className="max-w-xl mx-auto py-8 text-center space-y-6">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-950/80 border border-indigo-800/60 flex items-center justify-center mx-auto text-indigo-400 shadow-lg shadow-indigo-950/50">
-                  <BotIcon className="w-6 h-6" />
+              <div className="max-w-lg mx-auto py-8 text-center space-y-5 min-w-0">
+                <div className="w-10 h-10 rounded-md bg-[#181818] border border-[#292929] flex items-center justify-center mx-auto text-[#929292]">
+                  <BotIcon className="w-5 h-5" />
                 </div>
 
                 <div className="space-y-1">
-                  <h3 className="text-base font-bold text-slate-100">
+                  <h3 className="text-sm font-semibold text-[#F5F5F5]">
                     Lectra Revision Chatbot
                   </h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-                    Ask questions about your lectures. Verified answers cite exact video timestamps.
+                  <p className="text-xs text-[#929292] max-w-sm mx-auto leading-relaxed">
+                    Ask questions about your lectures. Answers cite exact timestamps.
                     Click any citation to load the video in the split-screen player.
                   </p>
                 </div>
 
                 {/* Quick Starter Chips */}
-                <div className="space-y-2">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <div className="space-y-2 pt-2">
+                  <span className="text-[10px] font-medium text-[#626262] uppercase tracking-wider">
                     Example revision queries
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
@@ -356,12 +374,12 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
                       <button
                         key={idx}
                         onClick={() => handleSend(item.query)}
-                        className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-indigo-500/60 hover:bg-slate-900/60 transition group text-left"
+                        className="p-2.5 rounded-md bg-[#181818] border border-[#292929] hover:border-[#383838] hover:bg-[#202020] transition-colors group text-left min-w-0"
                       >
-                        <div className="text-xs font-semibold text-slate-300 group-hover:text-indigo-400 transition">
+                        <div className="text-xs font-medium text-[#F5F5F5] group-hover:text-white transition-colors truncate">
                           {item.title}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                        <div className="text-[11px] text-[#929292] truncate mt-0.5">
                           {item.query}
                         </div>
                       </button>
@@ -383,12 +401,12 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
 
             {/* Generating Indicator Bubble */}
             {isLoading && (
-              <div className="flex gap-3 max-w-2xl mr-auto animate-fade-in">
-                <div className="w-8 h-8 rounded-full bg-indigo-950 border border-indigo-700 flex items-center justify-center shrink-0 text-indigo-400">
-                  <BotIcon className="w-4 h-4" />
+              <div className="flex gap-2.5 max-w-xl mr-auto min-w-0 animate-fade-in">
+                <div className="w-6 h-6 rounded-md bg-[#181818] border border-[#292929] flex items-center justify-center shrink-0 text-[#929292] mt-0.5">
+                  <BotIcon className="w-3.5 h-3.5" />
                 </div>
-                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl rounded-tl-sm p-4 space-y-2 text-xs text-slate-400 font-mono flex items-center gap-3">
-                  <RefreshCwIcon className="w-4 h-4 animate-spin text-indigo-400" />
+                <div className="bg-[#181818] border border-[#292929] rounded-lg p-2.5 text-xs text-[#929292] font-mono flex items-center gap-2">
+                  <RefreshCwIcon className="w-3.5 h-3.5 animate-spin text-[#929292]" />
                   <span>Retrieving lecture context and generating grounded answer...</span>
                 </div>
               </div>
@@ -396,12 +414,12 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
 
             {/* Error Banner */}
             {errorBanner && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-900/60 text-xs text-rose-300">
+              <div className="flex items-center gap-2 p-2.5 rounded-md bg-[#181818] border border-[#292929] text-xs text-[#F5F5F5] min-w-0">
                 <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-400" />
-                <span className="flex-1">{errorBanner}</span>
+                <span className="flex-1 break-words">{errorBanner}</span>
                 <button
                   onClick={() => setErrorBanner(null)}
-                  className="text-slate-400 hover:text-slate-200 text-xs font-mono ml-2"
+                  className="text-[#626262] hover:text-[#F5F5F5] text-xs font-mono ml-2 shrink-0"
                 >
                   ✕
                 </button>
@@ -411,45 +429,45 @@ export function ChatInterface({ playlists, defaultPlaylistId }: ChatInterfacePro
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Fixed Bottom Message Input Bar */}
-          <div className="p-3 sm:p-4 border-t border-slate-800 bg-slate-950/90">
-            <div className="flex gap-2 items-end">
-              <div className="relative flex-1">
+          {/* Compact Bottom Message Input Bar */}
+          <div className="p-2.5 sm:p-3 border-t border-[#292929] bg-[#111111] min-w-0">
+            <div className="flex gap-2 items-center min-w-0">
+              <div className="relative flex-1 min-w-0">
                 <textarea
                   ref={textareaRef}
                   value={inputQuery}
                   onChange={(e) => setInputQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask a question about your revision lectures..."
-                  rows={2}
+                  rows={1}
                   disabled={isLoading}
-                  className="w-full resize-none px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-100 text-xs sm:text-sm placeholder-slate-500 outline-none transition disabled:opacity-60"
+                  className="w-full resize-none px-3 py-2 rounded-md bg-[#181818] border border-[#292929] focus:border-[#444] text-[#F5F5F5] text-xs sm:text-sm placeholder-[#626262] outline-none transition-colors disabled:opacity-50 min-h-[38px] max-h-[96px]"
                 />
               </div>
 
               <button
                 onClick={() => handleSend()}
                 disabled={isLoading || !inputQuery.trim()}
-                className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium text-xs sm:text-sm transition shadow-sm flex items-center justify-center gap-1.5 shrink-0"
+                className="px-3.5 py-2 rounded-md bg-[#F5F5F5] hover:bg-[#E5E5E5] disabled:bg-[#202020] disabled:text-[#626262] text-[#0A0A0A] font-medium text-xs transition-colors flex items-center justify-center gap-1.5 shrink-0 shadow-xs h-[38px]"
                 title="Send query (Enter)"
               >
                 {isLoading ? (
-                  <RefreshCwIcon className="w-4 h-4 animate-spin" />
+                  <RefreshCwIcon className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <SendIcon className="w-4 h-4" />
+                  <SendIcon className="w-3.5 h-3.5" />
                 )}
                 <span className="hidden sm:inline">Send</span>
               </button>
             </div>
-            <p className="text-[10px] text-slate-500 text-center mt-1.5 font-mono">
-              Press <kbd className="px-1 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">Enter</kbd> to send, <kbd className="px-1 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">Shift + Enter</kbd> for new line
+            <p className="text-[10px] text-[#626262] text-center mt-1 font-mono">
+              Press <kbd className="px-1 py-0.2 rounded bg-[#181818] border border-[#292929] text-[#929292]">Enter</kbd> to send, <kbd className="px-1 py-0.2 rounded bg-[#181818] border border-[#292929] text-[#929292]">Shift + Enter</kbd> for new line
             </p>
           </div>
         </div>
 
-        {/* RIGHT PANEL: Embedded YouTube Lecture Player (46% on desktop) */}
+        {/* RIGHT PANEL: Embedded YouTube Lecture Player (50% on desktop) */}
         <div
-          className={`w-full lg:w-[46%] h-full p-4 sm:p-5 overflow-y-auto bg-slate-950/60 ${
+          className={`w-full lg:w-1/2 h-full p-3 sm:p-4 overflow-y-auto bg-[#111111] min-w-0 ${
             mobileTab === "player" ? "flex flex-col" : "hidden lg:flex lg:flex-col"
           }`}
         >

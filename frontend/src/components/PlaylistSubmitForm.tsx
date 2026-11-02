@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { AlertCircleIcon, CheckCircleIcon, PlayIcon, RefreshCwIcon } from "./Icons";
+import { AlertCircleIcon, PlayIcon, RefreshCwIcon } from "./Icons";
 
 interface PlaylistSubmitFormProps {
   onSubmit: (url: string) => Promise<void>;
@@ -44,14 +44,14 @@ export function PlaylistSubmitForm({ onSubmit, isSubmitting }: PlaylistSubmitFor
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-sm">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+    <div className="bg-[#111111] border border-[#292929] rounded-xl p-4 sm:p-5 shadow-xs min-w-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3.5 min-w-0">
         <div>
-          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+          <h2 className="text-sm font-semibold text-[#F5F5F5] flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F5F5F5]"></span>
             Ingest YouTube Playlist
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-[#929292] mt-0.5">
             Submit a playlist to discover videos, download captions, translate to English, chunk, and index into Qdrant.
           </p>
         </div>
@@ -59,16 +59,16 @@ export function PlaylistSubmitForm({ onSubmit, isSubmitting }: PlaylistSubmitFor
         <button
           type="button"
           onClick={handleFillTestPlaylist}
-          className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/60 text-indigo-300 border border-indigo-800/50 hover:border-indigo-700 transition"
+          className="text-xs inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#181818] hover:bg-[#202020] text-[#929292] hover:text-[#F5F5F5] border border-[#292929] transition-colors shrink-0"
         >
-          <PlayIcon className="w-3 h-3 text-indigo-400" />
-          <span>Fill Verified Greedy Playlist (5 Videos)</span>
+          <PlayIcon className="w-3 h-3 text-[#929292]" />
+          <span>Fill Test Playlist (5 Videos)</span>
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
+      <form onSubmit={handleSubmit} className="space-y-3 min-w-0">
+        <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+          <div className="relative flex-1 min-w-0">
             <input
               type="text"
               value={url}
@@ -78,18 +78,18 @@ export function PlaylistSubmitForm({ onSubmit, isSubmitting }: PlaylistSubmitFor
               }}
               placeholder="https://www.youtube.com/playlist?list=PLgUwDviBIf0pmWCl2nepwGDO05a0-7EfJ"
               disabled={isSubmitting}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-100 text-sm placeholder-slate-500 outline-none transition disabled:opacity-60"
+              className="w-full px-3 py-2 rounded-md bg-[#181818] border border-[#292929] focus:border-[#444] text-[#F5F5F5] text-xs sm:text-sm placeholder-[#626262] outline-none transition-colors disabled:opacity-60"
             />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting || !url.trim()}
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium text-sm transition shadow-sm flex items-center justify-center gap-2 min-w-[130px]"
+            className="px-4 py-2 rounded-md bg-[#F5F5F5] hover:bg-[#E5E5E5] disabled:bg-[#202020] disabled:text-[#626262] text-[#0A0A0A] font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 min-w-[130px] shrink-0"
           >
             {isSubmitting ? (
               <>
-                <RefreshCwIcon className="w-4 h-4 animate-spin text-white" />
+                <RefreshCwIcon className="w-3.5 h-3.5 animate-spin text-[#0A0A0A]" />
                 <span>Submitting...</span>
               </>
             ) : (

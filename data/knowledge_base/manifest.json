@@ -1,0 +1,21 @@
+{
+  "format_version": "1.0",
+  "collection_name": "revision_chunks",
+  "export_timestamp": "2026-11-02T16:50:43.564569+00:00",
+  "archive_file": "chunks_7000.jsonl.gz",
+  "archive_sha256": "de5372a4e40f4eae394c633ba2ec4ea69e7adaf8280a62c17e94e4556219f7d7",
+  "compressed_size_bytes": 31373714,
+  "uncompressed_size_bytes": 84006393,
+  "point_count": 7000,
+  "vector_dimension": 768,
+  "distance_metric": "Cosine",
+  "vector_type": "unnamed",
+  "playlist_counts": {
+    "3820e00b-81b6-4f34-9e68-011ddc3d9f98": 6011,
+    "0fd210e4-904f-4127-b539-130cb1497377": 989
+  },
+  "playlist_titles": {
+    "3820e00b-81b6-4f34-9e68-011ddc3d9f98": "Strivers A2Z-DSA Course | DSA Playlist | Placements",
+    "0fd210e4-904f-4127-b539-130cb1497377": "Generative AI using LangChain"
+  }
+}

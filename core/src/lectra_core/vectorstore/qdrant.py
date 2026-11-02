@@ -1,6 +1,8 @@
 """Qdrant client and collection management for Revision RAG."""
 
-from typing import Any, List, Optional, Sequence
+from pathlib import Path
+import threading
+from typing import Any, Dict, List, Optional, Sequence
 
 from qdrant_client import QdrantClient, models
 
@@ -10,6 +12,41 @@ from lectra_core.logging import get_logger
 logger = get_logger("lectra.vectorstore.qdrant")
 
 EXPECTED_VECTOR_SIZE = 768
+
+# In-process singleton cache for local Qdrant clients (prevents portalocker concurrency crashes)
+_LOCAL_CLIENTS: Dict[str, QdrantClient] = {}
+_LOCAL_CLIENT_LOCK = threading.Lock()
+
+
+def get_local_qdrant_client(path: str | Path) -> QdrantClient:
+    """Return a thread-safe singleton QdrantClient for a local storage path.
+
+    Prevents multiple instances from locking the local database concurrently in the same process.
+    """
+    canonical_path = str(Path(path).resolve())
+    with _LOCAL_CLIENT_LOCK:
+        if canonical_path not in _LOCAL_CLIENTS:
+            try:
+                _LOCAL_CLIENTS[canonical_path] = QdrantClient(path=canonical_path)
+            except RuntimeError as exc:
+                if "already accessed by another instance" in str(exc):
+                    raise RuntimeError(
+                        f"Local Qdrant database at '{canonical_path}' is locked by another process. "
+                        "Ensure no other instance of Revision RAG, a background worker, or importer script is running."
+                    ) from exc
+                raise
+        return _LOCAL_CLIENTS[canonical_path]
+
+
+def close_local_qdrant_clients() -> None:
+    """Close and clear all cached local Qdrant clients (useful for cleanup and tests)."""
+    with _LOCAL_CLIENT_LOCK:
+        for client in _LOCAL_CLIENTS.values():
+            try:
+                client.close()
+            except Exception:
+                pass
+        _LOCAL_CLIENTS.clear()
 
 
 class IncompatibleCollectionError(Exception):
@@ -26,11 +63,36 @@ class QdrantVectorStore:
     ) -> None:
         self.settings = settings or get_settings()
         self.collection_name = self.settings.qdrant_collection_name
-        self.client = client or QdrantClient(
-            url=self.settings.qdrant_url,
-            api_key=self.settings.qdrant_api_key,
-            timeout=30,
-        )
+
+        if client is not None:
+            self.client = client
+            self.is_local = False
+        elif self.settings.app_mode == "USER":
+            # In USER mode, always use local persistent Qdrant
+            local_path = self.settings.qdrant_path
+            self.client = get_local_qdrant_client(local_path)
+            self.is_local = True
+        elif self.settings.qdrant_url:
+            # DEVELOPER mode with cloud / remote Qdrant URL
+            self.client = QdrantClient(
+                url=self.settings.qdrant_url,
+                api_key=self.settings.qdrant_api_key,
+                timeout=30,
+            )
+            self.is_local = False
+        else:
+            # DEVELOPER mode fallback to local Qdrant path
+            local_path = self.settings.qdrant_path
+            self.client = get_local_qdrant_client(local_path)
+            self.is_local = True
+
+    def close(self) -> None:
+        """Close connection if running as a remote client."""
+        if not self.is_local:
+            try:
+                self.client.close()
+            except Exception:
+                pass
 
     def ensure_collection(self) -> None:
         """Verify that the target collection exists and is valid, creating it if absent.
@@ -93,6 +155,10 @@ class QdrantVectorStore:
 
     def _create_payload_indexes(self) -> None:
         """Create keyword indexes on frequently filtered payload fields."""
+        if self.is_local:
+            # Local embedded Qdrant does not require or use explicit payload keyword indexes
+            return
+
         fields = ["video_id", "youtube_id", "playlist_id"]
         for field in fields:
             try:

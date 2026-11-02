@@ -1,176 +1,139 @@
-# Revision RAG (LECTRA)
+# Revision RAG
 
-Revision RAG is an open-source, self-hosted application that turns a YouTube playlist into a searchable revision knowledge base. It ingests video transcripts (preferring existing captions, falling back to audio-only transcription), translates supported non-English content to English while preserving timestamps, chunks and indexes content into Qdrant Cloud vector storage, and answers revision questions with grounded citations and clickable YouTube timestamp links.
+Revision RAG is an open-source revision knowledge base that turns YouTube playlists into searchable revision assistants with grounded answers and clickable timestamp citations.
 
-Lectra runs directly on the host machine using the project Python virtual environment (`.venv`) and uv for dependency management, plus a local Node.js installation for the frontend. Docker is not required.
+This version features a **zero-hosting-cost, local-first distribution architecture**:
+- **Pre-Indexed Knowledge Base**: Distributed with 7,000 vectors across **Strivers A2Z-DSA Course** and **Generative AI using LangChain**.
+- **Embedded Local Qdrant**: Operates embedded on disk at `data/qdrant` without Docker, cloud vector accounts, or remote retrieval servers.
+- **Compact Seed Database**: Seeded from `data/knowledge_base/student_revision_rag.db`.
+- **Private BYO-Key LLM Generation**: Uses your own free Groq API key (`openai/gpt-oss-120b`) for ultra-fast grounded answer generation.
 
-This repository is currently at **Phase 2 (YouTube Playlist Discovery)**.
+---
+
+## Quickstart (Student Setup)
+
+### 1. Prerequisites
+- **Git**
+- **Python 3.12+**
+- **uv** (`curl -LsSf https://astral.sh/uv/install.sh | sh` or via PowerShell)
+- **Node.js 20+ & npm**
+- A free **Groq API key** from [console.groq.com/keys](https://console.groq.com/keys)
+
+*(No Docker, no cloud accounts, and no GPU required!)*
+
+### 2. Install & Configure
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-username/revision-rag.git
+cd revision-rag
+
+# 2. Install Python and frontend dependencies
+uv sync
+npm --prefix frontend install
+
+# 3. Create .env from template
+cp .env.example .env
+```
+
+Open `.env` and set your Groq key:
+```ini
+APP_MODE=USER
+GROQ_API_KEY=gsk_your_actual_groq_api_key_here
+```
+
+### 3. Run Application
+
+```bash
+uv run python run.py
+```
+
+The runner automatically:
+1. Validates distribution assets.
+2. Auto-initializes local SQLite (`data/revision_rag.db`).
+3. Auto-imports the 7,000 vectors into local Qdrant (`data/qdrant/`) on first run.
+4. Starts the FastAPI backend (`http://127.0.0.1:8000`) and Next.js UI (`http://localhost:3000`).
+
+Open your browser to: **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+## Pre-Indexed Playlists
+
+1. **Strivers A2Z-DSA Course | DSA Playlist | Placements**
+   - **ID**: `3820e00b-81b6-4f34-9e68-011ddc3d9f98`
+   - **Vectors**: 6,011 chunks (313 indexed videos from 315 discovered, metadata count 316)
+   - **Topics**: Binary Search, Dynamic Programming, Graphs, Trees, Recursion, Arrays, Sorting.
+
+2. **Generative AI using LangChain**
+   - **ID**: `0fd210e4-904f-4127-b539-130cb1497377`
+   - **Vectors**: 989 chunks (20 indexed videos)
+   - **Topics**: Prompts, Models, Output Parsers, Memory, Chains, LCEL, Retrieval-Augmented Generation, Agents.
 
 ---
 
 ## Architecture Overview
 
-Revision RAG is structured as a modular monorepo:
-
-- **`core/` (`lectra-core`)**: The independent core processing module:
-  - Centralized Pydantic Settings configuration (`lectra_core.config`).
-  - Structured JSON and console logging with automatic secret masking (`lectra_core.logging`).
-  - SQLAlchemy models and SQLite connection management with WAL mode (`lectra_core.db`).
-  - Alembic database migration environment and version tracking (`core/alembic`).
-  - Standalone background ingestion worker (`lectra_core.worker` / CLI `lectra-worker`).
-- **`backend/` (`lectra-backend`)**: Lightweight FastAPI service:
-  - Health checks (`GET /api/v1/health`) and application endpoints.
-  - CORS middleware configured for the local frontend.
-  - Startup runner (`lectra-server`).
-- **`frontend/`**: Next.js 16 (App Router) interface styled with Tailwind CSS v4:
-  - Reverse proxy rewrites routing `/api/*` to the FastAPI backend.
-  - Real-time health inspection dashboard.
-- **Worker**: Standalone ingestion worker run from `lectra_core.worker`, independently of FastAPI.
-- **Vector Database**: **Qdrant Cloud** (free tier cluster) accessed securely over HTTPS.
-- **Persistent Storage**: Host directory `./data` (SQLite database, original/translated transcripts, chunk artifacts, and model cache) persists across restarts.
-
----
-
-## Prerequisites
-
-Ensure the following tools are installed on your host machine:
-
-| Tool | Tested Version | Notes |
-| :--- | :--- | :--- |
-| **Linux / OS** | Ubuntu / Linux x86_64 | CPU-only default, GPU optional |
-| **Python** | 3.12.13 | Project virtual environment at `.venv` |
-| **uv** | 0.11+ | Python packaging & dependency management |
-| **Node.js** | 22.23+ | Frontend runtime |
-| **npm** | 10.9+ | Frontend package manager |
-| **FFmpeg & FFprobe** | 7.1+ / git-master | Audio extraction & transcription fallback |
-
----
-
-## Local Development Quickstart
-
-Lectra runs on the host machine. Each service (backend, worker, frontend) is started independently — no Docker is required.
-
-### 1. Configure Environment Variables
-
-Copy the example environment configuration to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and fill in your Qdrant Cloud cluster URL, Qdrant API key, and Groq API key:
-
-```ini
-QDRANT_URL=https://your-cluster-url.cloud.qdrant.io
-QDRANT_API_KEY=your_qdrant_api_key
-GROQ_API_KEY=your_groq_api_key
-```
-
-> **Security Note:** Provider secrets (`QDRANT_API_KEY`, `GROQ_API_KEY`) are backend-only. The frontend never receives these credentials. Never commit `.env` to version control.
-
-### 2. Install Dependencies
-
-Install backend/core packages into the project virtual environment with uv, and install frontend dependencies:
-
-```bash
-make install
-```
-
-This uses the existing Python environment at `.venv` and `uv`.
-
-### 3. Run Database Migrations
-
-```bash
-make migrate
-```
-
-### 4. Run Services Individually
-
-Open one terminal per service:
-
-```bash
-# Terminal 1: FastAPI Backend (port 8000)
-make run-backend
-
-# Terminal 2: Ingestion Worker Daemon
-make run-worker
-
-# Terminal 3: Next.js Frontend (port 3000)
-make run-frontend
-```
-
-Access the services:
-- **Frontend Dashboard**: `http://localhost:3000`
-- **Backend Health Check**: `http://localhost:8000/api/v1/health`
-- **Backend OpenAPI Docs**: `http://localhost:8000/docs`
-
-### Discovery API Endpoints (Phase 2)
-
-- `POST /api/v1/playlists` - Submit a playlist URL for discovery (validates URL and enqueues job)
-- `GET /api/v1/playlists` - List all registered playlists
-- `GET /api/v1/playlists/{playlist_id}` - Get playlist metadata by UUID or YouTube ID
-- `GET /api/v1/playlists/{playlist_id}/status` - Get discovery progress and video counts
-- `GET /api/v1/playlists/{playlist_id}/videos` - List all discovered videos in original position order
-- `GET /api/v1/jobs/{job_id}` - Check status of background jobs
-
-Stop each service with `Ctrl+C` in its terminal.
-
----
-
-## Persistent Storage Architecture
-
-All persistent application data is stored under the configured host data directory (`./data` by default, or `DATA_DIR` from `.env`):
-
-- **SQLite Database**: `./data/revision_rag.db`
-- **Transcript Artifacts**: `./data/artifacts/`
-- **Temporary Audio**: `./data/temp_audio/`
-- **Model Cache**: `./data/models/`
-
-Data persists across service restarts and host reboots. The `data/` directory, `.venv`, `node_modules`, and `.env` are excluded from version control via `.gitignore`.
-
----
-
----
-
-## Testing & Quality Assurance
-
-Run automated unit and integration tests (which execute completely independent of Docker):
-
-```bash
-make test
-```
-
-Run code formatting and linting:
-
-```bash
-# Run lint checks (Ruff for Python, ESLint for Next.js)
-make lint
-
-# Automatically format Python code
-make format
-```
-
-Clean temporary caches and bytecode:
-
-```bash
-make clean
+```mermaid
+flowchart LR
+    User[Student Browser] -->|UI / Question| NextJS[Next.js Frontend :3000]
+    NextJS -->|/api/v1/query| FastAPI[FastAPI Backend :8000]
+    FastAPI -->|768d Vector Query| LocalQdrant[(Local Qdrant data/qdrant)]
+    FastAPI -->|Playlist & Video Metadata| SQLite[(SQLite data/revision_rag.db)]
+    LocalQdrant -->|Retrieved Chunks + Timestamps| FastAPI
+    FastAPI -->|Prompt + Context| GroqAPI[Groq API Cloud]
+    GroqAPI -->|Grounded Prose| FastAPI
+    FastAPI -->|Answer + Clickable YouTube URLs| NextJS
 ```
 
 ---
 
-## Troubleshooting
+## Application Modes
 
-### Qdrant Connection Issues
-
-Revision RAG uses Qdrant Cloud. Verify that:
-1. `QDRANT_URL` in `.env` starts with `https://` and includes the cluster hostname.
-2. `QDRANT_API_KEY` is set and valid.
-3. Your host has outbound HTTPS access to Qdrant Cloud.
+- **`APP_MODE=USER` (Default)**:
+  - Connects to local persistent Qdrant at `data/qdrant/`.
+  - Ingestion and video retry endpoints are disabled (HTTP 403) to protect the prebuilt knowledge base.
+  - Requires only `GROQ_API_KEY`.
+- **`APP_MODE=DEVELOPER`**:
+  - Unlocks local discovery, audio downloading, Whisper speech-to-text fallback, and Qdrant ingestion.
+  - Can connect to Qdrant Cloud or a local Qdrant server for new playlist ingestion.
 
 ---
 
-## Security & Repository Guidelines
+## Repository Structure
 
-- **Zero Secret Exposure**: Never commit `.env` or credentials. Secrets are excluded via `.gitignore` and never passed into frontend client assets.
-- **CPU Baseline**: All defaults run on standard x86_64 CPUs. GPU acceleration (`EXECUTION_DEVICE=cuda`) is optional.
-- **Deterministic Checkpoints**: Stage progression in subsequent phases requires validated persistent artifacts before SQLite checkpoints advance.
+```
+├── run.py                          # Unified cross-platform runner
+├── data/
+│   ├── knowledge_base/             # Prebuilt distribution assets
+│   │   ├── chunks_7000.jsonl.gz    # 7,000 vectors + payloads (29.9 MB gzip)
+│   │   ├── manifest.json           # SHA-256 integrity manifest
+│   │   └── student_revision_rag.db # Clean SQLite seed (11 MB)
+│   ├── qdrant/                     # Local embedded vector database
+│   └── revision_rag.db             # Local SQLite database
+├── core/                           # lectra-core: vectorstore, retrieval, generation
+├── backend/                        # lectra-backend: FastAPI REST API
+├── frontend/                       # Next.js 16 App Router UI with Tailwind CSS
+├── scripts/
+│   ├── load_knowledge_base.py      # Qdrant local importer
+│   ├── export_knowledge_base.py    # Qdrant export tool
+│   └── create_student_database.py  # SQLite seed generator
+└── docs/
+    └── SETUP.md                    # Detailed onboarding guide
+```
+
+---
+
+## Testing
+
+Run the full test suite with:
+
+```bash
+uv run pytest tests/ backend/tests/ -v
+```
+
+---
+
+## License
+
+MIT License.

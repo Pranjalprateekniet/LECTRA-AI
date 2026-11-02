@@ -1,6 +1,7 @@
 """Health check API endpoints."""
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Response, status
@@ -28,18 +29,30 @@ def get_health(
         db_status = f"error: {str(e)}"
         http_status = status.HTTP_503_SERVICE_UNAVAILABLE
 
+    components: Dict[str, Any] = {
+        "api": "healthy",
+        "database": db_status,
+    }
+    if settings.app_mode == "USER":
+        local_qdrant_ready = Path(settings.qdrant_path).exists()
+        components["qdrant_configured"] = local_qdrant_ready or bool(settings.retrieval_api_url)
+        components["qdrant_mode"] = "remote" if settings.retrieval_api_url else "local"
+        components["local_qdrant_path"] = str(settings.qdrant_path)
+        if settings.retrieval_api_url:
+            components["retrieval_api_configured"] = True
+    else:
+        components["qdrant_configured"] = bool(settings.qdrant_url) or Path(settings.qdrant_path).exists()
+        components["qdrant_mode"] = "cloud" if settings.qdrant_url else "local"
+
     response_payload = {
         "status": "ok" if http_status == status.HTTP_200_OK else "degraded",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "0.1.0",
+        "app_mode": settings.app_mode,
         "environment": settings.environment,
         "database": db_status,
         "execution_device": settings.execution_device,
-        "components": {
-            "api": "healthy",
-            "database": db_status,
-            "qdrant_configured": bool(settings.qdrant_url),
-        },
+        "components": components,
     }
 
     if http_status != status.HTTP_200_OK:

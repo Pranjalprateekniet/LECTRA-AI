@@ -46,10 +46,10 @@ function renderFormattedParagraph(
             key={i}
             type="button"
             onClick={() => onSelectCitation?.(citation)}
-            className={`inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded font-mono font-bold text-xs transition cursor-pointer select-none ${
+            className={`inline-flex items-center px-1.5 py-0.2 mx-0.5 rounded font-mono font-medium text-[11px] transition-colors cursor-pointer select-none ${
               isSelected
-                ? "bg-indigo-600 text-white shadow-sm ring-1 ring-indigo-400"
-                : "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30"
+                ? "bg-[#F5F5F5] text-[#0A0A0A] border border-[#F5F5F5] shadow-xs"
+                : "bg-[#202020] text-[#929292] hover:text-[#F5F5F5] hover:bg-[#292929] border border-[#292929]"
             }`}
             title={`Play ${citation.video_title} in lecture player`}
           >
@@ -72,12 +72,12 @@ export function ChatMessageBubble({
 
   if (isUser) {
     return (
-      <div className="flex justify-end gap-3 max-w-3xl ml-auto">
-        <div className="flex flex-col items-end">
-          <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-md max-w-xl text-sm leading-relaxed">
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+      <div className="flex justify-end gap-2 max-w-[85%] sm:max-w-[78%] ml-auto min-w-0">
+        <div className="flex flex-col items-end min-w-0">
+          <div className="bg-[#202020] text-[#F5F5F5] border border-[#292929] rounded-lg px-3 py-2 text-xs sm:text-sm leading-relaxed min-w-0 break-words [overflow-wrap:anywhere]">
+            <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
-          <span className="text-[11px] text-slate-500 font-mono mt-1 px-1">
+          <span className="text-[10px] text-[#626262] font-mono mt-0.5 px-0.5">
             {new Date(message.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -85,8 +85,8 @@ export function ChatMessageBubble({
           </span>
         </div>
 
-        <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-slate-300">
-          <UserIcon className="w-4 h-4" />
+        <div className="w-6 h-6 rounded-md bg-[#181818] border border-[#292929] flex items-center justify-center shrink-0 text-[#929292] mt-0.5">
+          <UserIcon className="w-3.5 h-3.5" />
         </div>
       </div>
     );
@@ -103,46 +103,43 @@ export function ChatMessageBubble({
       case "answered":
         return {
           icon: CheckCircleIcon,
-          color: "text-emerald-400 bg-emerald-950/40 border-emerald-800/50",
-          label: "Fully Grounded in Lecture Transcripts",
+          dotColor: "bg-emerald-500",
+          label: "Fully Grounded in Transcripts",
         };
       case "partially_answered":
         return {
           icon: AlertCircleIcon,
-          color: "text-amber-400 bg-amber-950/40 border-amber-800/50",
-          label: "Partially Supported (Missing Info Highlighted)",
+          dotColor: "bg-amber-400",
+          label: "Partially Supported",
         };
       case "insufficient_context":
         return {
-          icon: AlertCircleIcon,
-          color: "text-slate-400 bg-slate-900 border-slate-800",
-          label: "Insufficient Lecture Context (Abstention)",
+          icon: ClockIcon,
+          dotColor: "bg-[#626262]",
+          label: "Insufficient Context (Abstained)",
         };
     }
   };
 
   const badge = getStatusBadge();
-  const StatusIcon = badge.icon;
 
   return (
-    <div className="flex gap-3 max-w-4xl mr-auto">
-      <div className="w-8 h-8 rounded-full bg-indigo-950 border border-indigo-700 flex items-center justify-center shrink-0 text-indigo-400 shadow-sm">
-        <BotIcon className="w-4 h-4" />
+    <div className="flex gap-2.5 max-w-[96%] sm:max-w-[92%] mr-auto min-w-0 w-full">
+      <div className="w-6 h-6 rounded-md bg-[#181818] border border-[#292929] flex items-center justify-center shrink-0 text-[#929292] mt-0.5">
+        <BotIcon className="w-3.5 h-3.5" />
       </div>
 
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 space-y-2 min-w-0">
         {/* Answer Bubble Card */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl rounded-tl-sm p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="bg-[#181818] border border-[#292929] rounded-lg p-3 sm:p-3.5 space-y-2.5 min-w-0">
           {/* Header Status Bar */}
-          <div className="flex items-center justify-between gap-2 flex-wrap pb-3 border-b border-slate-800/80">
-            <span
-              className={`inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-full border ${badge.color}`}
-            >
-              <StatusIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>{badge.label}</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-[#292929] min-w-0">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-mono px-2 py-0.5 rounded border border-[#292929] bg-[#111111] text-[#929292]">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.dotColor}`} />
+              <span className="truncate">{badge.label}</span>
             </span>
 
-            <span className="text-[11px] text-slate-500 font-mono">
+            <span className="text-[10px] text-[#626262] font-mono">
               {new Date(message.timestamp).toLocaleTimeString([], {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -151,9 +148,9 @@ export function ChatMessageBubble({
           </div>
 
           {/* Answer Text Content with Clickable Citation Pills */}
-          <div className="text-sm text-slate-200 leading-relaxed space-y-3">
+          <div className="text-xs sm:text-sm text-[#F5F5F5] leading-relaxed space-y-2 min-w-0 break-words [overflow-wrap:anywhere]">
             {message.content.split("\n\n").map((para, idx) => (
-              <p key={idx} className="whitespace-pre-wrap break-words">
+              <p key={idx} className="whitespace-pre-wrap">
                 {renderFormattedParagraph(
                   para,
                   citations,
@@ -167,53 +164,51 @@ export function ChatMessageBubble({
 
           {/* Partially Answered Notice */}
           {status === "partially_answered" && (
-            <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-900/50 text-xs text-amber-300/90 space-y-1">
-              <div className="font-semibold flex items-center gap-1.5">
-                <AlertCircleIcon className="w-4 h-4 text-amber-400" />
+            <div className="p-2 rounded-md bg-[#111111] border border-[#292929] text-[11px] text-[#929292] space-y-0.5 min-w-0">
+              <div className="font-medium text-[#F5F5F5] flex items-center gap-1.5">
+                <AlertCircleIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>Partial Lecture Support</span>
               </div>
-              <p className="text-[11px] text-slate-300">
-                Part of your question was answered using verified lecture transcripts. Any aspects
-                not covered above were omitted because they are not present in the indexed videos.
+              <p className="text-[10px] text-[#929292] leading-relaxed">
+                Part of this answer is verified from lecture transcripts. Aspects not covered above were omitted because they are not present in indexed videos.
               </p>
             </div>
           )}
 
           {/* Insufficient Context Notice */}
           {status === "insufficient_context" && (
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 space-y-1">
-              <div className="font-semibold text-slate-300 flex items-center gap-1.5">
-                <ClockIcon className="w-4 h-4 text-slate-400" />
-                <span>Strict Grounding Enforcement</span>
+            <div className="p-2 rounded-md bg-[#111111] border border-[#292929] text-[11px] text-[#929292] space-y-0.5 min-w-0">
+              <div className="font-medium text-[#F5F5F5] flex items-center gap-1.5">
+                <ClockIcon className="w-3.5 h-3.5 text-[#626262] shrink-0" />
+                <span>Grounding Enforcement</span>
               </div>
-              <p className="text-[11px]">
-                Lectra strictly abstains from inventing answers when the indexed video transcripts
-                do not contain relevant content for this question.
+              <p className="text-[10px] text-[#929292] leading-relaxed">
+                Lectra strictly abstains from inventing answers when the indexed video transcripts do not contain relevant content.
               </p>
             </div>
           )}
 
           {/* Supporting Sources Section */}
           {hasCitations && (
-            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+            <div className="pt-1.5 border-t border-[#292929] space-y-1.5 min-w-0">
               <div
                 onClick={() => setSourcesOpen(!sourcesOpen)}
-                className="flex items-center justify-between cursor-pointer select-none py-1 group"
+                className="flex items-center justify-between cursor-pointer select-none py-0.5 group min-w-0"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-300 group-hover:text-indigo-400 transition">
-                    Retrieved Supporting Sources ({citations.length})
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs font-medium text-[#929292] group-hover:text-[#F5F5F5] transition-colors truncate">
+                    Sources ({citations.length})
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#111111] border border-[#292929] text-[#626262] font-mono shrink-0">
                     Click to Play
                   </span>
                 </div>
 
                 <button
                   type="button"
-                  className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 font-mono"
+                  className="text-[11px] text-[#626262] hover:text-[#929292] flex items-center gap-0.5 font-mono transition-colors shrink-0"
                 >
-                  <span>{sourcesOpen ? "Hide Sources" : "Show Sources"}</span>
+                  <span>{sourcesOpen ? "Hide" : "Show"}</span>
                   {sourcesOpen ? (
                     <ChevronDownIcon className="w-3.5 h-3.5" />
                   ) : (
@@ -223,7 +218,7 @@ export function ChatMessageBubble({
               </div>
 
               {sourcesOpen && (
-                <div className="space-y-2 pt-1">
+                <div className="space-y-1.5 pt-0.5 min-w-0">
                   {citations.map((c) => {
                     const isSelected =
                       Boolean(selectedCitation) &&

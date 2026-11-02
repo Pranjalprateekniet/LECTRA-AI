@@ -30,13 +30,13 @@ ignore = []
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
-extraPaths = ["core/src", "backend/src"]
+extraPaths = ["core/src", "backend/src", "."]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 addopts = "-ra -q"
-testpaths = ["core/tests", "backend/tests"]
-pythonpath = ["core/src", "backend/src"]
+testpaths = ["core/tests", "backend/tests", "retrieval_service/tests"]
+pythonpath = ["core/src", "backend/src", "."]
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: integration tests requiring network access",

@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from lectra_backend.dependencies import get_retrieval_service
 from lectra_core.logging import get_logger
+from lectra_core.retrieval.remote import RemoteRetrievalService
 from lectra_core.retrieval.schemas import RetrievalQuery, SearchResponse
 from lectra_core.retrieval.service import RetrievalError, RetrievalService
 
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/retrieval", tags=["retrieval"])
 )
 def search_chunks(
     request: RetrievalQuery,
-    service: RetrievalService = Depends(get_retrieval_service),
+    service: RetrievalService | RemoteRetrievalService = Depends(get_retrieval_service),
 ) -> SearchResponse:
     """Accept natural-language query and return relevant transcript chunks with source citations."""
     try:

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from lectra_backend.dependencies import get_db_session
+from lectra_core.config import Settings, get_settings
 from lectra_core.db.models import (
     Job,
     Playlist,
@@ -219,8 +220,15 @@ def _get_playlist_counts(db: Session, playlist_id: str) -> Dict[str, int]:
 def submit_playlist(
     payload: PlaylistSubmitRequest,
     db: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> PlaylistSubmitResponse:
     """Submit a YouTube playlist URL for discovery and ingestion."""
+    if settings.app_mode == "USER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Playlist ingestion is disabled in USER mode. In USER mode, Revision RAG "
+            "operates as a revision assistant querying the central knowledge base.",
+        )
     try:
         validated = validate_playlist_url(payload.url)
     except InvalidPlaylistUrlError as exc:
@@ -634,8 +642,14 @@ def get_playlist_activity(
 def retry_playlist_ingestion(
     playlist_id: str,
     db: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> RetryResponse:
     """Retry ingestion for failed or incomplete videos in a playlist."""
+    if settings.app_mode == "USER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Playlist ingestion is disabled in USER mode.",
+        )
     playlist = _find_playlist(db, playlist_id)
     if playlist is None:
         raise HTTPException(
@@ -700,8 +714,14 @@ def retry_playlist_ingestion(
 def retry_video_ingestion(
     video_id: str,
     db: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> RetryResponse:
     """Retry ingestion for an individual failed video at its current failed stage."""
+    if settings.app_mode == "USER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Video ingestion retry is disabled in USER mode.",
+        )
     video = db.scalars(select(Video).where(Video.id == video_id)).first()
     if video is None:
         raise HTTPException(
@@ -754,8 +774,14 @@ def delete_playlist_video(
     playlist_id: str,
     video_id: str,
     db: Session = Depends(get_db_session),
+    settings: Settings = Depends(get_settings),
 ) -> VideoDeleteResponse:
     """Delete a video and its derived transcripts, chunks, embeddings, and artifacts."""
+    if settings.app_mode == "USER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Video deletion is disabled in USER mode.",
+        )
     playlist = _find_playlist(db, playlist_id)
     if playlist is None:
         raise HTTPException(

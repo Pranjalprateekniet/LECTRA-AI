@@ -27,51 +27,55 @@ export function ActivityLog({ events, loading }: ActivityLogProps) {
       case "success":
         return {
           icon: CheckCircleIcon,
-          color: "text-emerald-400 bg-emerald-950/40 border-emerald-800/40",
+          color: "text-[#929292] bg-[#181818] border-[#292929]",
+          dot: "bg-emerald-500",
           text: "Success",
         };
       case "error":
         return {
           icon: AlertCircleIcon,
-          color: "text-rose-400 bg-rose-950/40 border-rose-800/40",
+          color: "text-[#929292] bg-[#181818] border-[#292929]",
+          dot: "bg-rose-500",
           text: "Error",
         };
       case "warning":
         return {
           icon: AlertCircleIcon,
-          color: "text-amber-400 bg-amber-950/40 border-amber-800/40",
+          color: "text-[#929292] bg-[#181818] border-[#292929]",
+          dot: "bg-amber-400",
           text: "Warning",
         };
       default:
         return {
           icon: ClockIcon,
-          color: "text-indigo-400 bg-indigo-950/40 border-indigo-800/40",
+          color: "text-[#929292] bg-[#181818] border-[#292929]",
+          dot: "bg-[#626262]",
           text: "Info",
         };
     }
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LayersIcon className="w-4 h-4 text-indigo-400" />
-          <h3 className="font-semibold text-sm text-slate-100">Live Ingestion Activity Log</h3>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
+    <div className="bg-[#111111] border border-[#292929] rounded-xl overflow-hidden shadow-xs min-w-0">
+      <div className="p-3 sm:p-3.5 border-b border-[#292929] flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <LayersIcon className="w-3.5 h-3.5 text-[#929292] shrink-0" />
+          <h3 className="font-medium text-xs sm:text-sm text-[#F5F5F5] truncate">Live Activity Log</h3>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#181818] text-[#626262] font-mono border border-[#292929] shrink-0">
             {filteredEvents.length} events
           </span>
         </div>
 
         {/* Severity filter */}
-        <div className="flex items-center gap-1 bg-slate-950/80 p-0.5 rounded-lg border border-slate-800 text-[11px]">
+        <div className="flex items-center gap-0.5 bg-[#181818] p-0.5 rounded-md border border-[#292929] text-[11px] shrink-0">
           {["ALL", "SUCCESS", "ERROR", "INFO"].map((s) => (
             <button
               key={s}
               onClick={() => setFilterSeverity(s)}
-              className={`px-2 py-0.5 rounded font-medium transition ${
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
                 filterSeverity === s
-                  ? "bg-indigo-600 text-white"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-[#202020] text-[#F5F5F5] border border-[#292929]"
+                  : "text-[#929292] hover:text-[#F5F5F5]"
               }`}
             >
               {s.charAt(0) + s.slice(1).toLowerCase()}
@@ -81,18 +85,17 @@ export function ActivityLog({ events, loading }: ActivityLogProps) {
       </div>
 
       {loading && events.length === 0 ? (
-        <div className="p-8 text-center text-slate-400 text-xs animate-pulse font-mono">
+        <div className="p-6 text-center text-[#929292] text-xs animate-pulse font-mono min-w-0">
           Loading pipeline activity records...
         </div>
       ) : filteredEvents.length === 0 ? (
-        <div className="p-8 text-center text-slate-500 text-xs font-mono">
+        <div className="p-6 text-center text-[#626262] text-xs font-mono min-w-0">
           No ingestion activity recorded matching criteria.
         </div>
       ) : (
-        <div className="max-h-72 overflow-y-auto divide-y divide-slate-800/60 font-mono text-xs">
+        <div className="max-h-64 overflow-y-auto divide-y divide-[#292929] font-mono text-xs min-w-0">
           {filteredEvents.map((ev) => {
             const badge = getSeverityBadge(ev.severity);
-            const Icon = badge.icon;
             const timeStr = new Date(ev.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -102,41 +105,33 @@ export function ActivityLog({ events, loading }: ActivityLogProps) {
             return (
               <div
                 key={ev.id}
-                className="p-3 hover:bg-slate-850/40 transition flex items-start gap-3"
+                className="p-2 sm:px-3 flex items-start gap-2 hover:bg-[#141414] transition-colors min-w-0"
               >
-                {/* Timestamp */}
-                <span className="text-slate-500 text-[11px] shrink-0 mt-0.5">
-                  {timeStr}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${badge.dot}`} />
+                  <span className="text-[10px] text-[#626262]">{timeStr}</span>
+                </div>
 
-                {/* Stage & Event */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
-                      {ev.stage}
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <span className="font-semibold text-[#F5F5F5] text-[11px] truncate">
+                      {ev.event}
                     </span>
-                    <span className="font-medium text-slate-200">{ev.event}</span>
-                    {ev.video_title && (
-                      <span className="text-slate-400 text-[11px] truncate max-w-xs">
-                        — {ev.video_title}
+                    <span className="text-[10px] text-[#929292] font-mono">
+                      [{ev.stage}]
+                    </span>
+                    {ev.video_id && (
+                      <span className="text-[10px] text-[#626262] bg-[#181818] border border-[#292929] px-1 py-0.2 rounded shrink-0">
+                        {ev.video_title ? ev.video_title : `video:${ev.video_id}`}
                       </span>
                     )}
                   </div>
-
                   {ev.details && (
-                    <p className="text-[11px] text-slate-400 mt-0.5 truncate break-all">
+                    <p className="text-[11px] text-[#929292] font-sans mt-0.5 break-words [overflow-wrap:anywhere]">
                       {ev.details}
                     </p>
                   )}
                 </div>
-
-                {/* Severity pill */}
-                <span
-                  className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${badge.color}`}
-                >
-                  <Icon className="w-3 h-3" />
-                  <span>{badge.text}</span>
-                </span>
               </div>
             );
           })}

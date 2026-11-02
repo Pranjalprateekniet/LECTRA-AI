@@ -22,36 +22,36 @@ export function PlaylistProgressBar({ status }: PlaylistProgressBarProps) {
   const pctPending = Math.max(0, 100 - pctCompleted - pctProcessing - pctFailed);
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-2">
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-200">Ingestion Progress:</span>
-          <span className="font-mono text-indigo-400">
+    <div className="bg-[#111111] border border-[#292929] rounded-lg p-3 space-y-2 min-w-0">
+      <div className="flex flex-wrap items-center justify-between text-xs gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-medium text-[#F5F5F5] text-xs">Progress:</span>
+          <span className="font-mono text-[#F5F5F5] text-xs">
             {completed} of {total} videos indexed
           </span>
-          <span className="text-slate-500">({pctCompleted}%)</span>
+          <span className="text-[#626262] text-xs font-mono">({pctCompleted}%)</span>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+        <div className="flex items-center gap-3 text-[11px] font-mono text-[#929292] shrink-0">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
             <span>{completed} Indexed</span>
           </span>
           {processing > 0 && (
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5F5F5] inline-block animate-pulse"></span>
               <span>{processing} Running</span>
             </span>
           )}
           {failed > 0 && (
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
-              <span>{failed} Failed/Skip</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+              <span>{failed} Failed</span>
             </span>
           )}
           {pending > 0 && (
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-slate-600 inline-block"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#383838] inline-block"></span>
               <span>{pending} Pending</span>
             </span>
           )}
@@ -59,32 +59,32 @@ export function PlaylistProgressBar({ status }: PlaylistProgressBarProps) {
       </div>
 
       {/* Progress Bar Track */}
-      <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden flex">
+      <div className="w-full h-1.5 bg-[#181818] rounded-full overflow-hidden flex min-w-0 border border-[#292929]">
         {pctCompleted > 0 && (
           <div
             style={{ width: `${pctCompleted}%` }}
-            className="bg-emerald-500 transition-all duration-500"
+            className="bg-[#F5F5F5] transition-all duration-300"
             title={`${completed} completed (${pctCompleted}%)`}
           />
         )}
         {pctProcessing > 0 && (
           <div
             style={{ width: `${pctProcessing}%` }}
-            className="bg-indigo-500 transition-all duration-500 animate-pulse"
+            className="bg-[#626262] transition-all duration-300 animate-pulse"
             title={`${processing} processing (${pctProcessing}%)`}
           />
         )}
         {pctFailed > 0 && (
           <div
             style={{ width: `${pctFailed}%` }}
-            className="bg-rose-500 transition-all duration-500"
+            className="bg-rose-500 transition-all duration-300"
             title={`${failed} failed (${pctFailed}%)`}
           />
         )}
         {pctPending > 0 && (
           <div
             style={{ width: `${pctPending}%` }}
-            className="bg-slate-700 transition-all duration-500"
+            className="bg-[#202020] transition-all duration-300"
             title={`${pending} pending (${pctPending}%)`}
           />
         )}

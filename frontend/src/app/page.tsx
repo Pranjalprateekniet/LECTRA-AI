@@ -1,51 +1,25 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityEventResponse,
-  HealthData,
-  Playlist,
-  PlaylistStatusResponse,
-  VideoResponse,
-} from "@/types/api";
+import React, { useCallback, useEffect, useState } from "react";
+import { HealthData, Playlist } from "@/types/api";
 import { api } from "@/lib/api";
 import { Header } from "@/components/Header";
-import { PlaylistSubmitForm } from "@/components/PlaylistSubmitForm";
-import { PlaylistSelector } from "@/components/PlaylistSelector";
-import { StatisticsDashboard } from "@/components/StatisticsDashboard";
-import { PlaylistProgressBar } from "@/components/PlaylistProgressBar";
-import { VideoProcessingTable } from "@/components/VideoProcessingTable";
-import { ActivityLog } from "@/components/ActivityLog";
 import { ChatInterface } from "@/components/ChatInterface";
-import { AlertCircleIcon, CheckCircleIcon } from "@/components/Icons";
+import {
+  loadSelectedPlaylistId,
+  resolveActivePlaylistId,
+  saveSelectedPlaylistId,
+} from "@/lib/playlistStorage";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"ingestion" | "qa">("ingestion");
-
   // Backend Health
   const [health, setHealth] = useState<HealthData | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
 
-  // Playlists
+  // Playlists (for user scope selection in chat)
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
-  const [playlistsLoading, setPlaylistsLoading] = useState(true);
-
-  // Selected Playlist Data
-  const [status, setStatus] = useState<PlaylistStatusResponse | null>(null);
-  const [videos, setVideos] = useState<VideoResponse[]>([]);
-  const [activity, setActivity] = useState<ActivityEventResponse[]>([]);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-
-  // Submission & Actions
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Polling State
-  const [isPolling, setIsPolling] = useState(false);
-  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 1. Fetch Backend Health
   const checkHealth = useCallback(async () => {
@@ -59,7 +33,7 @@ export default function Home() {
     }
   }, []);
 
-  // 2. Fetch All Playlists
+  // 2. Fetch Ingested Playlists
   const loadPlaylists = useCallback(async () => {
     try {
       const data = await api.getPlaylists();
@@ -67,34 +41,19 @@ export default function Home() {
       if (data.length > 0) {
         setSelectedPlaylistId((prev) => {
           if (prev && data.some((p) => p.id === prev)) return prev;
-          // Prefer Greedy Algorithms playlist if found
-          const greedy = data.find((p) => p.youtube_id === "PLgUwDviBIf0pmWCl2nepwGDO05a0-7EfJ");
-          return greedy ? greedy.id : data[0].id;
+          const savedId = loadSelectedPlaylistId();
+          return resolveActivePlaylistId(data, savedId);
         });
       }
     } catch (err: unknown) {
       console.error("Failed to load playlists:", err);
-    } finally {
-      setPlaylistsLoading(false);
     }
   }, []);
 
-  // 3. Fetch Selected Playlist Details
-  const loadPlaylistDetails = useCallback(async (playlistId: string) => {
-    try {
-      const [st, vids, act] = await Promise.all([
-        api.getPlaylistStatus(playlistId),
-        api.getPlaylistVideos(playlistId),
-        api.getPlaylistActivity(playlistId, 40),
-      ]);
-      setStatus(st);
-      setVideos(vids);
-      setActivity(act);
-    } catch (err: unknown) {
-      console.error("Failed to load playlist details:", err);
-    } finally {
-      setDetailsLoading(false);
-    }
+  // Playlist selection change handler
+  const handlePlaylistChange = useCallback((id: string) => {
+    setSelectedPlaylistId(id);
+    saveSelectedPlaylistId(id);
   }, []);
 
   // Initial Load
@@ -103,248 +62,38 @@ export default function Home() {
     loadPlaylists();
   }, [checkHealth, loadPlaylists]);
 
-  // When selected playlist changes, load details
-  useEffect(() => {
-    if (!selectedPlaylistId) return;
-    setDetailsLoading(true);
-    loadPlaylistDetails(selectedPlaylistId);
-  }, [selectedPlaylistId, loadPlaylistDetails]);
-
-  // Determine whether active polling is required
-  const isPipelineActive = useCallback((): boolean => {
-    if (!status && videos.length === 0) return false;
-
-    // Check playlist level status
-    if (status?.status === "DISCOVERY_RUNNING" || status?.status === "IN_PROGRESS") {
-      return true;
-    }
-
-    // Check latest job status
-    if (status?.latest_job && (status.latest_job.status === "RUNNING" || status.latest_job.status === "QUEUED")) {
-      return true;
-    }
-
-    // Check if any video is non-terminal
-    return videos.some(
-      (v) =>
-        v.status === "IN_PROGRESS" ||
-        v.status === "DISCOVERED" ||
-        v.status === "TRANSCRIPT_READY" ||
-        v.status === "CHUNKED"
-    );
-  }, [status, videos]);
-
-  // Polling Effect
-  useEffect(() => {
-    if (pollingTimerRef.current) {
-      clearInterval(pollingTimerRef.current);
-      pollingTimerRef.current = null;
-    }
-
-    if (!selectedPlaylistId) {
-      setIsPolling(false);
-      return;
-    }
-
-    const active = isPipelineActive();
-    setIsPolling(active);
-
-    if (active) {
-      pollingTimerRef.current = setInterval(() => {
-        loadPlaylistDetails(selectedPlaylistId);
-      }, 3000);
-    }
-
-    return () => {
-      if (pollingTimerRef.current) {
-        clearInterval(pollingTimerRef.current);
-      }
-    };
-  }, [selectedPlaylistId, isPipelineActive, loadPlaylistDetails]);
-
   // Manual Refresh Handler
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        checkHealth(),
-        loadPlaylists(),
-        selectedPlaylistId ? loadPlaylistDetails(selectedPlaylistId) : Promise.resolve(),
-      ]);
+      await Promise.all([checkHealth(), loadPlaylists()]);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Submit Playlist Handler
-  const handlePlaylistSubmit = async (url: string) => {
-    setIsSubmitting(true);
-    setSubmitError(null);
-    setSubmitSuccess(null);
-
-    try {
-      const res = await api.submitPlaylist(url);
-      setSubmitSuccess(`Playlist accepted! Job ID: ${res.job_id}. Ingestion pipeline initiated.`);
-      await loadPlaylists();
-      setSelectedPlaylistId(res.playlist_id);
-      await loadPlaylistDetails(res.playlist_id);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to submit playlist";
-      setSubmitError(msg);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Retry Video Handler
-  const handleRetryVideo = async (videoId: string) => {
-    try {
-      await api.retryVideo(videoId);
-      if (selectedPlaylistId) {
-        await loadPlaylistDetails(selectedPlaylistId);
-      }
-    } catch (err: unknown) {
-      console.error("Retry failed:", err);
-    }
-  };
-
-  // Delete Video Handler with Optimistic UI updates
-  const handleDeleteVideo = async (videoId: string) => {
-    if (!selectedPlaylistId) return;
-
-    const previousVideos = [...videos];
-    const previousStatus = status ? { ...status } : null;
-    const targetVideo = videos.find((v) => v.id === videoId);
-
-    // Optimistic UI update: immediately remove video and adjust statistics
-    setVideos((prev) => prev.filter((v) => v.id !== videoId));
-    if (status && targetVideo) {
-      const isCompleted = targetVideo.status === "INDEXED";
-      const isFailed =
-        targetVideo.status === "FAILED" || targetVideo.status === "SKIPPED_UNAVAILABLE";
-      const isProcessing =
-        targetVideo.status === "IN_PROGRESS" ||
-        targetVideo.status === "DISCOVERED" ||
-        targetVideo.status === "TRANSCRIPT_READY" ||
-        targetVideo.status === "CHUNKED";
-
-      setStatus({
-        ...status,
-        video_count: Math.max(0, status.video_count - 1),
-        completed_count: isCompleted
-          ? Math.max(0, status.completed_count - 1)
-          : status.completed_count,
-        failed_count: isFailed ? Math.max(0, status.failed_count - 1) : status.failed_count,
-        processing_count: isProcessing
-          ? Math.max(0, status.processing_count - 1)
-          : status.processing_count,
-      });
-    }
-
-    try {
-      await api.deleteVideo(selectedPlaylistId, videoId);
-      // Reconcile with server state
-      await Promise.all([loadPlaylistDetails(selectedPlaylistId), loadPlaylists()]);
-    } catch (err: unknown) {
-      // Revert optimistic updates on failure
-      setVideos(previousVideos);
-      if (previousStatus) setStatus(previousStatus);
-      throw err;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Header */}
+    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex flex-col font-sans selection:bg-[#202020] selection:text-[#F5F5F5] w-full max-w-full overflow-x-hidden">
+      {/* User Header without Ingestion Tabs or Admin Links */}
       <Header
         health={health}
         healthLoading={healthLoading}
-        isPolling={isPolling}
         isRefreshing={isRefreshing}
         onRefresh={handleManualRefresh}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        isAdmin={false}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Tab 2: Revision Chatbot */}
-        <div className={activeTab === "qa" ? "block" : "hidden"}>
-          <ChatInterface
-            playlists={playlists}
-            defaultPlaylistId={selectedPlaylistId}
-          />
-        </div>
-
-        {/* Tab 1: Data Ingestion */}
-        <div className={activeTab === "ingestion" ? "space-y-6" : "hidden"}>
-          {/* Top Row: Playlist Submission Form */}
-          <PlaylistSubmitForm
-            onSubmit={handlePlaylistSubmit}
-            isSubmitting={isSubmitting}
-          />
-
-          {/* Submission Alerts */}
-          {submitSuccess && (
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/50 px-4 py-3 rounded-xl animate-fade-in">
-              <CheckCircleIcon className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span className="flex-1">{submitSuccess}</span>
-              <button
-                onClick={() => setSubmitSuccess(null)}
-                className="text-slate-400 hover:text-slate-200 text-xs ml-2"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {submitError && (
-            <div className="flex items-center gap-2 text-xs text-rose-400 bg-rose-950/40 border border-rose-800/50 px-4 py-3 rounded-xl animate-fade-in">
-              <AlertCircleIcon className="w-4 h-4 shrink-0 text-rose-400" />
-              <span className="flex-1">{submitError}</span>
-              <button
-                onClick={() => setSubmitError(null)}
-                className="text-slate-400 hover:text-slate-200 text-xs ml-2"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {/* Playlists Selector */}
-          <PlaylistSelector
-            playlists={playlists}
-            selectedId={selectedPlaylistId}
-            onSelect={(id) => setSelectedPlaylistId(id)}
-            isLoading={playlistsLoading}
-          />
-
-          {/* Selected Playlist Status & Metrics */}
-          {selectedPlaylistId && (
-            <div className="space-y-6 pt-2">
-              {/* 7 Metric Cards */}
-              <StatisticsDashboard status={status} loading={detailsLoading} />
-
-              {/* Progress Breakdown Bar */}
-              <PlaylistProgressBar status={status} />
-
-              {/* 6-Stage Video Pipeline Table */}
-              <VideoProcessingTable
-                videos={videos}
-                loading={detailsLoading}
-                onRetryVideo={handleRetryVideo}
-                onDeleteVideo={handleDeleteVideo}
-              />
-
-              {/* Persisted Chronological Activity Log */}
-              <ActivityLog events={activity} loading={detailsLoading} />
-            </div>
-          )}
-        </div>
+      {/* Main Revision Chat Interface */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-5 min-w-0 overflow-x-hidden">
+        <ChatInterface
+          playlists={playlists}
+          defaultPlaylistId={selectedPlaylistId}
+          onSelectPlaylist={handlePlaylistChange}
+        />
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-500 font-mono">
+      <footer className="border-t border-[#292929] bg-[#0A0A0A] py-3 text-center text-xs text-[#626262] font-mono">
         Lectra — YouTube Revision RAG Engine • EmbeddingGemma 2 (768d) • Qdrant Cloud • Groq GPT-OSS-120B
       </footer>
     </div>

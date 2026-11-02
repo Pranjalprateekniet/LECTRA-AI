@@ -16,6 +16,7 @@ from lectra_core.generation.schemas import (
     LLMRawAnswer,
 )
 from lectra_core.logging import get_logger
+from lectra_core.retrieval.remote import RemoteRetrievalService
 from lectra_core.retrieval.schemas import SearchResultItem
 from lectra_core.retrieval.service import RetrievalService
 
@@ -28,12 +29,24 @@ class GenerationService:
     def __init__(
         self,
         settings: Optional[Settings] = None,
-        retrieval_service: Optional[RetrievalService] = None,
+        retrieval_service: Optional[RetrievalService | RemoteRetrievalService] = None,
         groq_client: Optional[GroqClient] = None,
         context_builder: Optional[ContextBuilder] = None,
     ) -> None:
         self.settings = settings or get_settings()
-        self.retrieval_service = retrieval_service or RetrievalService(settings=self.settings)
+        if retrieval_service is not None:
+            self.retrieval_service = retrieval_service
+        elif self.settings.app_mode == "USER":
+            if not self.settings.retrieval_api_url:
+                raise ValueError(
+                    "Configuration error: In USER mode, RETRIEVAL_API_URL is mandatory. "
+                    "Cannot instantiate local retrieval in USER mode."
+                )
+            self.retrieval_service = RemoteRetrievalService(settings=self.settings)
+        elif self.settings.retrieval_api_url:
+            self.retrieval_service = RemoteRetrievalService(settings=self.settings)
+        else:
+            self.retrieval_service = RetrievalService(settings=self.settings)
         self.groq_client = groq_client or GroqClient(settings=self.settings)
         self.context_builder = context_builder or ContextBuilder(
             max_context_tokens=self.settings.groq_max_context_tokens,

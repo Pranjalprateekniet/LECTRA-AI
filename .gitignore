@@ -64,8 +64,11 @@ yarn-error.log*
 *.key
 
 # Application runtime data & storage
-data/
+data/*
+!data/knowledge_base/
+!data/knowledge_base/**
 *.db
+!data/knowledge_base/*.db
 *.sqlite
 *.sqlite3
 artifacts/
