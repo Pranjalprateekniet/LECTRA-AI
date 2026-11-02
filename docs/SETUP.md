@@ -59,64 +59,65 @@ npm --version
 
 ---
 
-## 2. Clone the Repository & Install Dependencies
+## 2. Automated One-Command Installation (Recommended)
 
-Clone the repository and enter the directory:
+### Linux & macOS
 
 ```bash
 git clone https://github.com/your-username/revision-rag.git
 cd revision-rag
+./install.sh
 ```
 
-Install Python dependencies with `uv`:
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/your-username/revision-rag.git
+cd revision-rag
+.\install.ps1
+```
+
+The automated installer will:
+1. Detect your operating system and CPU architecture.
+2. Verify Python 3.12+ and Node.js 20+ installations.
+3. Create the Python virtual environment (`.venv`).
+4. Install all backend and frontend dependencies.
+5. Create `.env` from template and prompt for your free Groq API key.
+6. Verify the prebuilt knowledge-base assets (7,000 vectors) against their SHA-256 checksums.
+7. Run complete preflight checks.
+
+---
+
+## 3. Launching Revision RAG
+
+Once installation completes, launch the backend and frontend with:
+
+### Linux & macOS
+```bash
+./start.sh
+```
+
+### Windows (PowerShell)
+```powershell
+.\start.ps1
+```
+
+Open your browser at:
+👉 **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+## 4. Manual Setup Alternative (Advanced Users)
+
+If you prefer installing dependencies manually with `uv`:
+
 ```bash
 uv sync
-```
-
-Install frontend Next.js dependencies:
-```bash
 npm --prefix frontend install
+cp .env.example .env
+# Set GROQ_API_KEY in .env
+uv run python run.py
 ```
-
----
-
-## 3. Obtain a Free Groq API Key
-
-Revision RAG uses Groq to generate grounded revision answers with citations:
-
-1. Sign up for a free Groq Cloud account at [console.groq.com](https://console.groq.com/).
-2. Navigate to **API Keys** at [console.groq.com/keys](https://console.groq.com/keys).
-3. Click **Create API Key**, copy the key (starts with `gsk_...`).
-
----
-
-## 4. Configure Your Environment
-
-Copy the example `.env` file:
-
-- **macOS / Linux**:
-  ```bash
-  cp .env.example .env
-  ```
-- **Windows (PowerShell)**:
-  ```powershell
-  Copy-Item .env.example .env
-  ```
-
-Open `.env` in any text editor and paste your Groq API key:
-
-```ini
-APP_MODE=USER
-GROQ_API_KEY=gsk_your_actual_groq_api_key_here
-```
-
-All other settings (database paths, model configuration, ports) have automatic, battle-tested defaults.
-
----
-
-## 5. Launch Revision RAG
-
-Start the entire application with a single command:
 
 ```bash
 uv run python run.py

@@ -250,9 +250,13 @@ def import_knowledge_base(
 
     # Move from staging to destination
     if destination.exists():
-        shutil.rmtree(destination)
+        shutil.rmtree(destination, ignore_errors=True)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    staging_dir.rename(destination)
+    try:
+        staging_dir.rename(destination)
+    except OSError:
+        shutil.copytree(staging_dir, destination, dirs_exist_ok=True)
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
     if not quiet:
         print(f"Local Qdrant database committed to final destination: {destination}")

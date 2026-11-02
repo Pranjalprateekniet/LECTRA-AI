@@ -10,51 +10,59 @@ This version features a **zero-hosting-cost, local-first distribution architectu
 
 ---
 
-## Quickstart (Student Setup)
+## Quickstart (Beginner-Friendly Setup)
 
-### 1. Prerequisites
-- **Git**
-- **Python 3.12+**
-- **uv** (`curl -LsSf https://astral.sh/uv/install.sh | sh` or via PowerShell)
-- **Node.js 20+ & npm**
-- A free **Groq API key** from [console.groq.com/keys](https://console.groq.com/keys)
-
-*(No Docker, no cloud accounts, and no GPU required!)*
-
-### 2. Install & Configure
+### Linux & macOS (One-Command Setup)
 
 ```bash
-# 1. Clone repository
+# 1. Clone the repository
 git clone https://github.com/your-username/revision-rag.git
 cd revision-rag
 
-# 2. Install Python and frontend dependencies
+# 2. Run automated installer
+./install.sh
+
+# 3. Launch application
+./start.sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+# 1. Clone the repository
+git clone https://github.com/your-username/revision-rag.git
+cd revision-rag
+
+# 2. Run automated installer
+.\install.ps1
+
+# 3. Launch application
+.\start.ps1
+```
+
+During installation, you will be prompted for your free **Groq API key** (get one at [console.groq.com/keys](https://console.groq.com/keys)). The installer automatically configures `.env`, builds the virtual environment, verifies the 7,000 pre-indexed vector chunks, and initializes the local database.
+
+Once started, open your web browser at:
+👉 **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+### Manual / Advanced Setup
+
+If you prefer manual control with `uv`:
+
+```bash
+# Install dependencies
 uv sync
 npm --prefix frontend install
 
-# 3. Create .env from template
+# Configure environment
 cp .env.example .env
-```
+# Edit .env and set your GROQ_API_KEY
 
-Open `.env` and set your Groq key:
-```ini
-APP_MODE=USER
-GROQ_API_KEY=gsk_your_actual_groq_api_key_here
-```
-
-### 3. Run Application
-
-```bash
+# Launch unified runner
 uv run python run.py
 ```
-
-The runner automatically:
-1. Validates distribution assets.
-2. Auto-initializes local SQLite (`data/revision_rag.db`).
-3. Auto-imports the 7,000 vectors into local Qdrant (`data/qdrant/`) on first run.
-4. Starts the FastAPI backend (`http://127.0.0.1:8000`) and Next.js UI (`http://localhost:3000`).
-
-Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
@@ -97,6 +105,23 @@ flowchart LR
 - **`APP_MODE=DEVELOPER`**:
   - Unlocks local discovery, audio downloading, Whisper speech-to-text fallback, and Qdrant ingestion.
   - Can connect to Qdrant Cloud or a local Qdrant server for new playlist ingestion.
+
+### Adding Your Own Playlists (Developer Mode)
+
+1. Open `.env` in any text editor and change:
+   ```ini
+   APP_MODE=DEVELOPER
+   ```
+2. Start the application:
+   ```bash
+   ./start.sh   # On Linux / macOS
+   # or
+   .\start.ps1  # On Windows
+   ```
+3. Open the Administration Panel in your browser:
+   👉 **[http://localhost:3000/admin](http://localhost:3000/admin)**
+4. Paste any public YouTube playlist URL and click **Submit Playlist**.
+5. The automated ingestion worker will discover videos, extract transcripts (or transcribe audio with faster-whisper if captions are unavailable), translate into English if needed, generate 768-dimensional embeddings, and index the chunks into Qdrant.
 
 ---
 

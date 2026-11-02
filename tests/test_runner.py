@@ -12,7 +12,6 @@ Covers:
 """
 
 import os
-from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
@@ -20,13 +19,11 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
-from qdrant_client import QdrantClient
-
-import run
 from lectra_core.config import Settings
 from lectra_core.retrieval.schemas import RetrievalQuery
 from lectra_core.retrieval.service import RetrievalService
-from lectra_core.vectorstore.qdrant import QdrantVectorStore
+
+import run
 
 STRIVER_PLAYLIST_ID = "3820e00b-81b6-4f34-9e68-011ddc3d9f98"
 LANGCHAIN_PLAYLIST_ID = "0fd210e4-904f-4127-b539-130cb1497377"
@@ -129,7 +126,7 @@ def test_process_lifecycle_and_termination():
 
 def test_clean_install_simulation_in_isolated_directory(tmp_path):
     """Clean-install simulation:
-    
+
     1. Neither student database exists in tmp_path.
     2. Initializes SQLite from student seed.
     3. Validates Qdrant collection point count and metadata.
@@ -189,3 +186,39 @@ def test_clean_install_simulation_in_isolated_directory(tmp_path):
     assert res_st.results[0].playlist_id == STRIVER_PLAYLIST_ID
     assert res_st.results[0].start_seconds >= 0
 
+    from lectra_core.vectorstore.qdrant import close_local_qdrant_clients
+    close_local_qdrant_clients()
+
+
+def test_installation_and_launch_scripts_exist():
+    """Verify that all one-command install and launch scripts exist with correct permissions."""
+    install_sh = run.PROJECT_ROOT / "install.sh"
+    start_sh = run.PROJECT_ROOT / "start.sh"
+    install_ps1 = run.PROJECT_ROOT / "install.ps1"
+    start_ps1 = run.PROJECT_ROOT / "start.ps1"
+
+    assert install_sh.exists()
+    assert start_sh.exists()
+    assert install_ps1.exists()
+    assert start_ps1.exists()
+
+    # Check executable permissions on POSIX
+    if os.name == "posix":
+        assert os.access(install_sh, os.X_OK)
+        assert os.access(start_sh, os.X_OK)
+
+
+def test_start_script_runs_check_only():
+    """Verify that ./start.sh --check-only executes cleanly."""
+    from lectra_core.vectorstore.qdrant import close_local_qdrant_clients
+    close_local_qdrant_clients()
+
+    start_sh = run.PROJECT_ROOT / "start.sh"
+    res = subprocess.run(
+        [str(start_sh), "--check-only"],
+        capture_output=True,
+        text=True,
+        cwd=str(run.PROJECT_ROOT),
+    )
+    assert res.returncode == 0
+    assert "Preflight checks passed" in res.stdout
