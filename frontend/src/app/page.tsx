@@ -73,7 +73,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex flex-col font-sans selection:bg-[#202020] selection:text-[#F5F5F5] w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen bg-[#0A0A0A] text-[#F5F5F5] flex flex-col font-sans selection:bg-[#4a4a4a] selection:text-white w-full max-w-full overflow-x-hidden">
       {/* User Header without Ingestion Tabs or Admin Links */}
       <Header
         health={health}

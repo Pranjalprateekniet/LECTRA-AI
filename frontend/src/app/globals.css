@@ -36,6 +36,17 @@ body {
   max-width: 100vw;
 }
 
+/* High-contrast text selection styling across all dark surfaces */
+::selection {
+  background-color: #4a4a4a;
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background-color: #4a4a4a;
+  color: #ffffff;
+}
+
 /* Developer-tool custom restrained scrollbar */
 ::-webkit-scrollbar {
   width: 5px;

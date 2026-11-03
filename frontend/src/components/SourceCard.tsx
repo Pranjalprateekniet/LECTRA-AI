@@ -122,17 +122,20 @@ export function SourceCard({
 
       {/* Collapsible Transcript Excerpt */}
       {isExpanded && (
-        <div className="px-3 py-2 bg-[#0E0E0E] border-t border-[#292929] text-xs text-[#929292] space-y-1.5 min-w-0">
-          <div className="flex items-center justify-between text-[10px] font-mono text-[#626262] min-w-0 flex-wrap gap-1">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="px-3 py-2 bg-[#0E0E0E] border-t border-[#292929] text-xs text-[#929292] space-y-1.5 min-w-0 select-text"
+        >
+          <div className="flex items-center justify-between text-[10px] font-mono text-[#626262] min-w-0 flex-wrap gap-1 select-none">
             <span>Verified Transcript Chunk #{citation.chunk_index}</span>
             <span className="text-[#929292]">Play at {startTimeStr}</span>
           </div>
 
-          <blockquote className="border-l-2 border-[#383838] pl-2.5 py-1 text-[#929292] italic text-xs leading-relaxed bg-[#111111] rounded-r break-words [overflow-wrap:anywhere]">
+          <blockquote className="border-l-2 border-[#383838] pl-2.5 py-1 text-[#929292] italic text-xs leading-relaxed bg-[#111111] rounded-r break-words [overflow-wrap:anywhere] select-text cursor-text selection:bg-[#4a4a4a] selection:text-white">
             {citation.text ? (
-              <span>&ldquo;{citation.text}&rdquo;</span>
+              <span className="select-text cursor-text">&ldquo;{citation.text}&rdquo;</span>
             ) : (
-              <span className="text-[#626262]">
+              <span className="text-[#626262] select-text cursor-text">
                 Transcript segment text recorded at timestamp {startTimeStr} to {endTimeStr}.
               </span>
             )}

@@ -47,8 +47,8 @@ const STARTER_QUESTIONS = [
     query: "How does the Fractional Knapsack algorithm work and what is its time complexity?",
   },
   {
-    title: "Unsupported Topic Test",
-    query: "How does Dijkstra's algorithm find shortest paths in a graph?",
+    title: "Binary Search Fundamentals",
+    query: "How does binary search work, and what are its time complexity and edge cases?",
   },
 ];
 
