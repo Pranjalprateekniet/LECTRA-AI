@@ -16,8 +16,8 @@ This version features a **zero-hosting-cost, local-first distribution architectu
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/revision-rag.git
-cd revision-rag
+git clone https://github.com/Pranjalprateekniet/LECTRA-AI
+cd LECTRA-AI
 
 # 2. Run automated installer
 ./install.sh
@@ -30,8 +30,8 @@ cd revision-rag
 
 ```powershell
 # 1. Clone the repository
-git clone https://github.com/your-username/revision-rag.git
-cd revision-rag
+git clone https://github.com/Pranjalprateekniet/LECTRA-AI
+cd LECTRA-AI
 
 # 2. Run automated installer
 .\install.ps1

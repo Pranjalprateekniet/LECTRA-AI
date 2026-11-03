@@ -15,18 +15,26 @@ function Write-Err {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $ScriptDir
+if ($PSScriptRoot) {
+    Set-Location $PSScriptRoot
+} elseif ($MyInvocation.MyCommand.Path) {
+    Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
+}
 
 # 1. Verify virtual environment exists
 $VenvPy = ".venv\Scripts\python.exe"
 if (-not (Test-Path $VenvPy)) {
-    Write-Err "Python virtual environment not found at .venv."
-    Write-Host ""
-    Write-Host "Please run the installation script first:"
-    Write-Host "  .\install.ps1"
-    Write-Host ""
-    exit 1
+    $VenvPyAlt = ".venv/bin/python"
+    if (Test-Path $VenvPyAlt) {
+        $VenvPy = $VenvPyAlt
+    } else {
+        Write-Err "Python virtual environment not found at .venv."
+        Write-Host ""
+        Write-Host "Please run the installation script first:"
+        Write-Host "  .\install.ps1"
+        Write-Host ""
+        exit 1
+    }
 }
 
 # 2. Verify .env exists
@@ -40,17 +48,23 @@ if (-not (Test-Path ".env")) {
 }
 
 # 3. Verify GROQ_API_KEY is configured
-$GroqKey = & $VenvPy -c @"
+$readGroqKeyScript = @'
 from pathlib import Path
-env_path = Path('.env')
-key = ''
+env_path = Path(".env")
+key = ""
 if env_path.exists():
-    for line in env_path.read_text(encoding='utf-8').splitlines():
-        if line.strip().startswith('GROQ_API_KEY=') and not line.strip().startswith('#'):
-            key = line.strip().split('=', 1)[1].strip().strip('\'\"')
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("GROQ_API_KEY=") and not line.startswith("#"):
+            key = line.split("=", 1)[1].strip().strip("\'\"")
             break
 print(key)
-"@
+'@
+
+$GroqKey = ($readGroqKeyScript | & $VenvPy -)
+if ($GroqKey) {
+    $GroqKey = $GroqKey.Trim()
+}
 
 if ([string]::IsNullOrWhiteSpace($GroqKey) -or $GroqKey -eq "your_groq_api_key_here") {
     Write-Err "GROQ_API_KEY is not configured in .env."
@@ -67,4 +81,6 @@ if ([string]::IsNullOrWhiteSpace($GroqKey) -or $GroqKey -eq "your_groq_api_key_h
 
 # 4. Launch unified runner
 & $VenvPy run.py @args
-exit $LASTEXITCODE
+if ($null -ne $LASTEXITCODE) {
+    exit $LASTEXITCODE
+}

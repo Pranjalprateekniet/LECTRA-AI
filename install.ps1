@@ -30,8 +30,11 @@ function Write-Err {
     Write-Host "[ERROR] $Message" -ForegroundColor Red
 }
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $ScriptDir
+if ($PSScriptRoot) {
+    Set-Location $PSScriptRoot
+} elseif ($MyInvocation.MyCommand.Path) {
+    Set-Location (Split-Path -Parent $MyInvocation.MyCommand.Path)
+}
 
 Write-Host "==============================================================================" -ForegroundColor White
 Write-Host "              Revision RAG — One-Command Installation System                  " -ForegroundColor White
@@ -53,11 +56,18 @@ Write-Step "Checking required system prerequisites..."
 $PythonBin = $null
 $PythonCandidates = @("python", "py", "python3.12", "python3")
 
+$pyVersionCheckScript = @'
+import sys
+if sys.version_info < (3, 12):
+    sys.exit(1)
+sys.exit(0)
+'@
+
 foreach ($cand in $PythonCandidates) {
     $cmd = Get-Command $cand -ErrorAction SilentlyContinue
     if ($cmd) {
         try {
-            $isMatch = & $cand -c "import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)"
+            $pyVersionCheckScript | & $cand - 2>$null | Out-Null
             if ($LASTEXITCODE -eq 0) {
                 $PythonBin = $cand
                 break
@@ -78,7 +88,15 @@ if (-not $PythonBin) {
     exit 1
 }
 
-$PyVersion = & $PythonBin -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"
+$pyVersionPrintScript = @'
+import sys
+print(f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+'@
+
+$PyVersion = ($pyVersionPrintScript | & $PythonBin -)
+if ($PyVersion) {
+    $PyVersion = $PyVersion.Trim()
+}
 Write-Success "Found Python: $PythonBin ($PyVersion)"
 
 # 2.2 Node.js & npm Check
@@ -93,7 +111,11 @@ if (-not $NodeCmd) {
 }
 
 $NodeVer = & node -v
-$NodeMajor = [int]($NodeVer.TrimStart('v').Split('.')[0])
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($NodeVer)) {
+    Write-Err "Failed to determine Node.js version."
+    exit 1
+}
+$NodeMajor = [int]($NodeVer.Trim().TrimStart('v').Split('.')[0])
 if ($NodeMajor -lt 20) {
     Write-Err "Node.js version 20+ is required (found $NodeVer). Please upgrade Node.js."
     exit 1
@@ -106,6 +128,11 @@ if (-not $NpmCmd) {
 }
 
 $NpmVer = & npm -v
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($NpmVer)) {
+    Write-Err "Failed to determine npm version."
+    exit 1
+}
+$NpmVer = $NpmVer.Trim()
 Write-Success "Found Node.js: $NodeVer and npm: $NpmVer"
 
 # ------------------------------------------------------------------------------
@@ -142,40 +169,51 @@ if ($MissingAssets) {
     exit 1
 }
 
-# Verify SHA-256 Checksum using Python
-& $PythonBin -c @"
+# Verify SHA-256 Checksum using Python via standard input
+$shaVerifyScript = @'
 import hashlib, json, sys
 from pathlib import Path
 
-manifest_path = Path('data/knowledge_base/manifest.json')
-archive_path = Path('data/knowledge_base/chunks_7000.jsonl.gz')
+manifest_path = Path("data/knowledge_base/manifest.json")
+archive_path = Path("data/knowledge_base/chunks_7000.jsonl.gz")
 
 try:
-    with open(manifest_path, 'r', encoding='utf-8') as f:
+    with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
-    expected_sha = manifest.get('archive_sha256')
+    expected_sha = manifest.get("archive_sha256")
 
     h = hashlib.sha256()
-    with open(archive_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
+    with open(archive_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     actual_sha = h.hexdigest()
 
     if actual_sha != expected_sha:
-        print(f'Checksum mismatch for {archive_path.name}:', file=sys.stderr)
-        print(f'  Expected: {expected_sha}', file=sys.stderr)
-        print(f'  Actual:   {actual_sha}', file=sys.stderr)
+        print(f"Checksum mismatch for {archive_path.name}:", file=sys.stderr)
+        print(f"  Expected: {expected_sha}", file=sys.stderr)
+        print(f"  Actual:   {actual_sha}", file=sys.stderr)
         sys.exit(1)
 except Exception as e:
-    print(f'Failed to verify knowledge base archive: {e}', file=sys.stderr)
+    print(f"Failed to verify knowledge base archive: {e}", file=sys.stderr)
     sys.exit(1)
-"@
+'@
 
+$shaVerifyScript | & $PythonBin -
 if ($LASTEXITCODE -ne 0) {
     Write-Err "Knowledge base archive checksum validation failed."
     exit 1
 }
 Write-Success "Knowledge base assets verified (7,000 vectors, SHA-256 validated)."
+
+# Pre-initialize SQLite runtime database if not present
+$RuntimeDb = "data\revision_rag.db"
+if (-not (Test-Path $RuntimeDb)) {
+    Write-Step "Initializing local SQLite database from student seed..."
+    Copy-Item $SeedDb $RuntimeDb -Force
+    Write-Success "SQLite database initialized at $RuntimeDb."
+} else {
+    Write-Step "Existing SQLite database found at $RuntimeDb."
+}
 
 # ------------------------------------------------------------------------------
 # 5. Setup Python Virtual Environment (.venv)
@@ -194,6 +232,10 @@ if (-not (Test-Path ".venv")) {
     } else {
         & $PythonBin -m venv .venv
     }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Failed to create Python virtual environment in .venv."
+        exit 1
+    }
     Write-Success "Virtual environment created at .venv."
 } else {
     Write-Step "Existing virtual environment found at .venv."
@@ -201,8 +243,13 @@ if (-not (Test-Path ".venv")) {
 
 $VenvPy = ".venv\Scripts\python.exe"
 if (-not (Test-Path $VenvPy)) {
-    Write-Err "Python executable not found at $VenvPy."
-    exit 1
+    $VenvPyAlt = ".venv/bin/python"
+    if (Test-Path $VenvPyAlt) {
+        $VenvPy = $VenvPyAlt
+    } else {
+        Write-Err "Python executable not found at $VenvPy."
+        exit 1
+    }
 }
 
 # ------------------------------------------------------------------------------
@@ -210,9 +257,13 @@ if (-not (Test-Path $VenvPy)) {
 # ------------------------------------------------------------------------------
 Write-Step "Checking and installing Python packages (core and backend)..."
 
+$checkPackagesScript = @'
+import lectra_core, lectra_backend
+'@
+
 $PackagesInstalled = $false
 try {
-    & $VenvPy -c "import lectra_core, lectra_backend" 2>$null
+    $checkPackagesScript | & $VenvPy - 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
         $PackagesInstalled = $true
     }
@@ -228,6 +279,10 @@ if ($PackagesInstalled) {
     } else {
         & $VenvPy -m pip install -e core -e backend --quiet
     }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Failed to install Python dependencies from core and backend."
+        exit 1
+    }
     Write-Success "Python dependencies installed successfully."
 }
 
@@ -237,12 +292,17 @@ if ($PackagesInstalled) {
 Write-Step "Checking and installing Next.js frontend dependencies..."
 if (Test-Path "frontend") {
     $NextPkg = "frontend\node_modules\next\package.json"
-    if (Test-Path $NextPkg) {
+    $NextPkgAlt = "frontend/node_modules/next/package.json"
+    if ((Test-Path $NextPkg) -or (Test-Path $NextPkgAlt)) {
         Write-Success "Frontend packages are already installed."
     } else {
         Push-Location frontend
         try {
             & npm install --silent
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "Frontend dependency installation (npm install) failed."
+                exit 1
+            }
         } finally {
             Pop-Location
         }
@@ -270,18 +330,24 @@ if (-not (Test-Path ".env")) {
     Write-Step "Existing .env file preserved."
 }
 
-# Check current GROQ_API_KEY
-$CurrentGroqKey = & $VenvPy -c @"
+# Reusable Python script for reading GROQ_API_KEY from .env via stdin
+$readGroqKeyScript = @'
 from pathlib import Path
-p = Path('.env')
-key = ''
+p = Path(".env")
+key = ""
 if p.exists():
-    for line in p.read_text(encoding='utf-8').splitlines():
-        if line.strip().startswith('GROQ_API_KEY=') and not line.strip().startswith('#'):
-            key = line.strip().split('=', 1)[1].strip().strip('\'\"')
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("GROQ_API_KEY=") and not line.startswith("#"):
+            key = line.split("=", 1)[1].strip().strip("\'\"")
             break
 print(key)
-"@
+'@
+
+$CurrentGroqKey = ($readGroqKeyScript | & $VenvPy -)
+if ($CurrentGroqKey) {
+    $CurrentGroqKey = $CurrentGroqKey.Trim()
+}
 
 $NeedKey = $false
 if ([string]::IsNullOrWhiteSpace($CurrentGroqKey) -or $CurrentGroqKey -eq "your_groq_api_key_here") {
@@ -301,23 +367,42 @@ if ($NeedKey) {
     $EnteredKey = $EnteredKey.Trim()
 
     if (-not [string]::IsNullOrWhiteSpace($EnteredKey) -and $EnteredKey -ne "your_groq_api_key_here") {
-        & $VenvPy -c @"
-import sys
+        $updateGroqKeyScript = @'
+import os, sys
 from pathlib import Path
-p = Path('.env')
-lines = p.read_text(encoding='utf-8').splitlines()
+
+p = Path(".env")
+if not p.exists():
+    sys.exit(1)
+
+new_key = os.environ.get("REVISION_RAG_GROQ_KEY", "").strip()
+if not new_key:
+    sys.exit(1)
+
+lines = p.read_text(encoding="utf-8").splitlines()
 out = []
 replaced = False
 for line in lines:
-    if line.strip().startswith('GROQ_API_KEY='):
-        out.append(f'GROQ_API_KEY={sys.argv[1]}')
+    stripped = line.strip()
+    if stripped.startswith("GROQ_API_KEY=") and not stripped.startswith("#"):
+        out.append(f"GROQ_API_KEY={new_key}")
         replaced = True
     else:
         out.append(line)
 if not replaced:
-    out.append(f'GROQ_API_KEY={sys.argv[1]}')
-p.write_text('\n'.join(out) + '\n', encoding='utf-8')
-"@ $EnteredKey
+    out.append(f"GROQ_API_KEY={new_key}")
+p.write_text("\n".join(out) + "\n", encoding="utf-8")
+'@
+        $env:REVISION_RAG_GROQ_KEY = $EnteredKey
+        try {
+            $updateGroqKeyScript | & $VenvPy -
+        } finally {
+            Remove-Item env:REVISION_RAG_GROQ_KEY -ErrorAction SilentlyContinue
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Failed to save Groq API key to .env."
+            exit 1
+        }
         Write-Success "Groq API key safely saved to .env."
     } else {
         Write-Warn "No API key was entered. You will need to add it manually to .env before starting."
@@ -331,21 +416,18 @@ p.write_text('\n'.join(out) + '\n', encoding='utf-8')
 # ------------------------------------------------------------------------------
 Write-Step "Running system and preflight validation..."
 
-$ActiveKey = & $VenvPy -c @"
-from pathlib import Path
-p = Path('.env')
-key = ''
-if p.exists():
-    for l in p.read_text(encoding='utf-8').splitlines():
-        if l.strip().startswith('GROQ_API_KEY=') and not l.strip().startswith('#'):
-            key = l.strip().split('=', 1)[1].strip().strip('\'\"')
-print(key)
-"@
+$ActiveKey = ($readGroqKeyScript | & $VenvPy -)
+if ($ActiveKey) {
+    $ActiveKey = $ActiveKey.Trim()
+}
 
 if (-not [string]::IsNullOrWhiteSpace($ActiveKey) -and $ActiveKey -ne "your_groq_api_key_here") {
     & $VenvPy run.py --check-only
     if ($LASTEXITCODE -eq 0) {
         Write-Success "All preflight verification checks passed."
+    } else {
+        Write-Err "Preflight verification checks failed."
+        exit 1
     }
 } else {
     Write-Step "Skipping active runner check because GROQ_API_KEY is not yet configured."
