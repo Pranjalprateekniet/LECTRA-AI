@@ -76,6 +76,23 @@ def log_err(msg: str) -> None:
 # --------------------------------------------------------------------------
 
 
+def check_python_version() -> None:
+    """Enforce that Revision RAG runs exclusively under Python 3.12.x."""
+    major = sys.version_info[0]
+    minor = sys.version_info[1]
+    micro = sys.version_info[2]
+    if major != 3 or minor != 12:
+        log_err(
+            f"Unsupported Python version: {major}.{minor}.{micro}.\n"
+            f"Revision RAG is strictly locked to Python 3.12.x (received {major}.{minor}.{micro}).\n"
+            f"Current interpreter: {sys.executable}\n\n"
+            f"Please run Revision RAG using a Python 3.12 virtual environment:\n"
+            f"  - Windows:       py -3.12 -m venv .venv && .venv\\Scripts\\activate\n"
+            f"  - Linux/macOS:   python3.12 -m venv .venv && source .venv/bin/activate\n"
+        )
+        sys.exit(1)
+
+
 def check_distribution_assets() -> None:
     """Ensure all required prebuilt distribution assets exist."""
     required = [
@@ -303,12 +320,12 @@ def run_services(
 
     if not node_modules.exists():
         log_warn("Frontend dependencies (node_modules) are not installed.")
-        print("Installing frontend packages via npm install...")
+        print("Installing frontend packages via npm ci...")
         npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
-        npm_res = subprocess.run([npm_cmd, "install"], cwd=str(frontend_dir))
+        npm_res = subprocess.run([npm_cmd, "ci"], cwd=str(frontend_dir))
         if npm_res.returncode != 0:
-            log_err("npm install failed in frontend/ directory.")
-            print("Please run manually: npm --prefix frontend install")
+            log_err("npm ci failed in frontend/ directory.")
+            print("Please run manually: npm ci --prefix frontend")
             sys.exit(1)
 
     npm_bin = shutil.which("npm.cmd" if sys.platform == "win32" else "npm") or "npm"
@@ -343,9 +360,10 @@ def run_services(
     print("=" * 65)
     print("Press Ctrl+C to stop all services.\n")
 
+    env_vars = load_env_vars()
     env_copy = os.environ.copy()
     env_copy["PYTHONUNBUFFERED"] = "1"
-    env_copy["APP_MODE"] = "USER"
+    env_copy["APP_MODE"] = os.environ.get("APP_MODE") or env_vars.get("APP_MODE") or "USER"
     env_copy["NEXT_PUBLIC_API_URL"] = f"http://127.0.0.1:{backend_port}"
 
     processes: List[subprocess.Popen] = []
@@ -412,6 +430,9 @@ def run_services(
 
 
 def main() -> None:
+    # Step 0: Enforce Python 3.12.x version lock before any application operations
+    check_python_version()
+
     parser = argparse.ArgumentParser(
         description="Unified local-first runner for Revision RAG."
     )

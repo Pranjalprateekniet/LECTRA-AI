@@ -1,0 +1,25 @@
+# Revision RAG — Third-Party Runtime Dependencies (core + backend)
+# Python 3.12.x compatible
+
+# Core dependencies
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+sqlalchemy>=2.0.30
+alembic>=1.13.0
+python-dotenv>=1.0.0
+qdrant-client>=1.13.0
+groq>=0.9.0
+torch>=2.0.0
+transformers>=4.40.0
+yt-dlp>=2025.10.22
+faster-whisper>=1.0.0
+av>=11.0.0,<14.0.0
+httpx>=0.27.0
+
+# Backend API dependencies
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+
+# Build dependencies for local editable package installs
+hatchling>=1.20.0
+editables>=0.5

@@ -2,11 +2,10 @@
 # Makefile - Revision RAG Local Development (Host)
 # ==============================================================================
 # Lectra runs directly on the host machine using the project Python virtual
-# environment (.venv) and uv for dependency management. Docker is not used.
+# environment (.venv) and pip for dependency management. Docker is not used.
 
 SHELL := /bin/bash
 PYTHON_BIN := .venv/bin/python
-UV_BIN := uv
 PYTEST := .venv/bin/pytest
 RUFF := .venv/bin/ruff
 ALEMBIC := .venv/bin/alembic
@@ -17,7 +16,7 @@ NPM := npm --prefix frontend
 help:
 	@echo "Available commands:"
 	@echo "  --- Local Development (Host) ---"
-	@echo "  make install        - Install backend/core (via uv in .venv) and frontend dependencies"
+	@echo "  make install        - Install backend/core (via pip in .venv) and frontend dependencies"
 	@echo "  make test           - Run backend and core unit tests with pytest"
 	@echo "  make lint           - Run python linting (ruff) and frontend linting (eslint)"
 	@echo "  make format         - Format python codebase with ruff"
@@ -31,10 +30,11 @@ help:
 # --- Local Development Targets ---
 
 install:
-	@echo "Installing python packages into .venv environment using uv..."
-	$(UV_BIN) pip install --python $(PYTHON_BIN) -e core -e backend pytest pytest-asyncio httpx ruff mypy
+	@echo "Installing python packages into .venv environment using pip..."
+	$(PYTHON_BIN) -m pip install --upgrade pip
+	$(PYTHON_BIN) -m pip install -r requirements-dev.txt
 	@echo "Installing frontend dependencies with npm..."
-	$(NPM) install
+	$(NPM) ci
 
 test:
 	@echo "Running tests in .venv environment..."

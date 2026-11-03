@@ -3,7 +3,7 @@ name = "revision-rag"
 version = "0.1.0"
 description = "Self-hosted YouTube revision knowledge base with timestamped citations"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.12.*"
 dependencies = []
 
 [tool.uv.workspace]

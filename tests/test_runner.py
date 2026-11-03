@@ -190,35 +190,46 @@ def test_clean_install_simulation_in_isolated_directory(tmp_path):
     close_local_qdrant_clients()
 
 
-def test_installation_and_launch_scripts_exist():
-    """Verify that all one-command install and launch scripts exist with correct permissions."""
+def test_custom_scripts_do_not_exist():
+    """Verify that obsolete custom shell/PowerShell scripts have been removed."""
     install_sh = run.PROJECT_ROOT / "install.sh"
     start_sh = run.PROJECT_ROOT / "start.sh"
     install_ps1 = run.PROJECT_ROOT / "install.ps1"
     start_ps1 = run.PROJECT_ROOT / "start.ps1"
 
-    assert install_sh.exists()
-    assert start_sh.exists()
-    assert install_ps1.exists()
-    assert start_ps1.exists()
-
-    # Check executable permissions on POSIX
-    if os.name == "posix":
-        assert os.access(install_sh, os.X_OK)
-        assert os.access(start_sh, os.X_OK)
+    assert not install_sh.exists()
+    assert not start_sh.exists()
+    assert not install_ps1.exists()
+    assert not start_ps1.exists()
 
 
-def test_start_script_runs_check_only():
-    """Verify that ./start.sh --check-only executes cleanly."""
+def test_run_py_executes_check_only():
+    """Verify that python run.py --check-only executes cleanly."""
     from lectra_core.vectorstore.qdrant import close_local_qdrant_clients
     close_local_qdrant_clients()
 
-    start_sh = run.PROJECT_ROOT / "start.sh"
     res = subprocess.run(
-        [str(start_sh), "--check-only"],
+        [sys.executable, "run.py", "--check-only"],
         capture_output=True,
         text=True,
         cwd=str(run.PROJECT_ROOT),
     )
     assert res.returncode == 0
     assert "Preflight checks passed" in res.stdout
+
+
+def test_python_version_check_enforcement():
+    """Verify run.py check_python_version enforces Python 3.12."""
+    with patch("sys.version_info", (3, 11, 8)):
+        with pytest.raises(SystemExit) as exc:
+            run.check_python_version()
+        assert exc.value.code == 1
+
+    with patch("sys.version_info", (3, 13, 0)):
+        with pytest.raises(SystemExit) as exc:
+            run.check_python_version()
+        assert exc.value.code == 1
+
+    with patch("sys.version_info", (3, 12, 4)):
+        # Should not raise
+        run.check_python_version()

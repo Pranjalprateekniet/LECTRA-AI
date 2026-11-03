@@ -22,7 +22,7 @@ returns an answer with source video titles and clickable timestamps.
     on the user's machine by default.
 -   Self-hosted: the user runs the application locally on the host
     machine using the documented development setup (Python virtual
-    environment, uv, Node.js). Docker is not required.
+    environment, pip, Node.js). Docker is not required.
 -   Resumable: each video and processing stage is independently
     checkpointed.
 -   Source-grounded: every source link comes from stored metadata
@@ -370,7 +370,7 @@ IDs.
 ## 11. Local execution and distribution
 
 Lectra runs directly on the host machine using the project Python
-virtual environment (`.venv`) and uv for dependency management, plus a
+virtual environment (`.venv`) and pip for dependency management, plus a
 local Node.js installation for the frontend. Docker is not required and
 is not part of the installation path.
 
