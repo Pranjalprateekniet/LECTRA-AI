@@ -183,6 +183,8 @@ pip install -e ./backend
 ### Step 5: Install Frontend Dependencies
 
 Install frontend dependencies strictly using the committed lockfile:
+cd frontend
+
 
 ```bash
 npm ci --prefix frontend
